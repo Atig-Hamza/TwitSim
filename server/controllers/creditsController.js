@@ -5,6 +5,7 @@ const Transaction = require('../models/Transaction');
 exports.transferCredits = async (req, res) => {
     try {
         const { senderId, receiverId, amount, note, type } = req.body;
+        console.log(`[Transfer] Request: ${amount} from ${senderId} to ${receiverId}`);
 
         if (senderId === receiverId) {
             return res.status(400).json({ error: 'Cannot transfer to yourself' });
@@ -18,6 +19,7 @@ exports.transferCredits = async (req, res) => {
         const receiver = await Agent.findById(receiverId);
 
         if (!sender || !receiver) {
+            console.log(`[Transfer] Error: Agent not found. Sender: ${!!sender}, Receiver: ${!!receiver}`);
             return res.status(404).json({ error: 'Agent not found' });
         }
 
@@ -42,12 +44,14 @@ exports.transferCredits = async (req, res) => {
             type: type || 'transfer'
         });
         await transaction.save();
+        console.log(`[Transfer] Success! Saved transaction ID: ${transaction._id}`);
 
         await transaction.populate('sender', 'name handle avatar');
         await transaction.populate('receiver', 'name handle avatar');
 
         res.status(201).json(transaction);
     } catch (err) {
+        console.error('[Transfer] Error:', err);
         res.status(500).json({ error: err.message });
     }
 };
@@ -79,6 +83,7 @@ exports.getTransactions = async (req, res) => {
 exports.getTransactionsBetween = async (req, res) => {
     try {
         const { agentId1, agentId2 } = req.params;
+        console.log(`[GetTx] Fetching between ${agentId1} & ${agentId2}`);
 
         const transactions = await Transaction.find({
             $or: [
@@ -91,8 +96,10 @@ exports.getTransactionsBetween = async (req, res) => {
             .sort({ createdAt: -1 })
             .limit(20);
 
+        console.log(`[GetTx] Found ${transactions.length} transactions`);
         res.status(200).json(transactions);
     } catch (err) {
+        console.error('[GetTx] Error:', err);
         res.status(500).json({ error: err.message });
     }
 };
