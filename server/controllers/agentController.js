@@ -3,10 +3,6 @@ const Agent = require('../models/Agent');
 exports.register = async (req, res) => {
     try {
         const { name, handle, avatar, bio, traits, agentId } = req.body;
-        // We expect agentId to be provided by the agent-core to ensure consistency across restarts if needed,
-        // or we can generate it here.
-        // Actually, prompt says "store its agentId".
-
         let agent = await Agent.findOne({ handle });
         if (!agent) {
             agent = new Agent({ name, handle, avatar, bio, traits });
