@@ -1,7 +1,22 @@
 import { Home, Hash, Bell, Mail, Bookmark, Users } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 
 const Sidebar = () => {
+    const location = useLocation();
+    const currentPath = location.pathname;
+
+    const isActive = (path) => {
+        if (path === '/') return currentPath === '/';
+        return currentPath.startsWith(path);
+    };
+
+    const navItems = [
+        { path: '/', icon: Home, label: 'Home' },
+        { path: '/explore', icon: Hash, label: 'Explore' },
+        { path: '/messages', icon: Mail, label: 'Messages' },
+        { path: '/agents', icon: Users, label: 'Agents' },
+    ];
+
     return (
         <div className="w-[275px] h-screen fixed left-0 top-0 border-r border-[#2f3336] flex flex-col items-end pr-4">
             <div className="w-[250px] flex flex-col h-full pl-2">
@@ -11,24 +26,27 @@ const Sidebar = () => {
                 </div>
 
                 <nav className="flex-1 space-y-1">
-                    <Link to="/" className="flex items-center gap-4 text-xl p-3 hover:bg-[#181818] rounded-full transition-colors w-fit">
-                        <Home size={26} strokeWidth={2} /> <span className="pr-4">Home</span>
-                    </Link>
-                    <div className="flex items-center gap-4 text-xl p-3 hover:bg-[#181818] rounded-full transition-colors w-fit cursor-not-allowed opacity-50">
-                        <Hash size={26} strokeWidth={2} /> <span className="pr-4">Explore</span>
+                    {navItems.map(({ path, icon: Icon, label }) => (
+                        <Link
+                            key={path}
+                            to={path}
+                            className={`flex items-center gap-4 text-xl p-3 hover:bg-[#181818] rounded-full transition-colors w-fit ${isActive(path) ? 'font-bold' : ''
+                                }`}
+                        >
+                            <Icon size={26} strokeWidth={isActive(path) ? 2.5 : 2} />
+                            <span className="pr-4">{label}</span>
+                        </Link>
+                    ))}
+
+                    {/* Disabled items */}
+                    <div className="flex items-center gap-4 text-xl p-3 text-gray-600 cursor-not-allowed w-fit">
+                        <Bell size={26} strokeWidth={2} />
+                        <span className="pr-4">Notifications</span>
                     </div>
-                    <div className="flex items-center gap-4 text-xl p-3 hover:bg-[#181818] rounded-full transition-colors w-fit cursor-not-allowed opacity-50">
-                        <Bell size={26} strokeWidth={2} /> <span className="pr-4">Notifications</span>
+                    <div className="flex items-center gap-4 text-xl p-3 text-gray-600 cursor-not-allowed w-fit">
+                        <Bookmark size={26} strokeWidth={2} />
+                        <span className="pr-4">Bookmarks</span>
                     </div>
-                    <div className="flex items-center gap-4 text-xl p-3 hover:bg-[#181818] rounded-full transition-colors w-fit cursor-not-allowed opacity-50">
-                        <Mail size={26} strokeWidth={2} /> <span className="pr-4">Messages</span>
-                    </div>
-                    <div className="flex items-center gap-4 text-xl p-3 hover:bg-[#181818] rounded-full transition-colors w-fit cursor-not-allowed opacity-50">
-                        <Bookmark size={26} strokeWidth={2} /> <span className="pr-4">Bookmarks</span>
-                    </div>
-                    <Link to="/agents" className="flex items-center gap-4 text-xl p-3 hover:bg-[#181818] rounded-full transition-colors w-fit">
-                        <Users size={26} strokeWidth={2} /> <span className="pr-4">Agents</span>
-                    </Link>
                 </nav>
 
                 {/* Footer info */}
