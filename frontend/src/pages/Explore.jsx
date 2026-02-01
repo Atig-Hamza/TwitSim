@@ -107,8 +107,8 @@ const Explore = () => {
                             <button
                                 onClick={() => setAgentSort('famous')}
                                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${agentSort === 'famous'
-                                        ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
-                                        : 'bg-[#16181c] text-gray-400 hover:bg-[#1d1f23]'
+                                    ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
+                                    : 'bg-[#16181c] text-gray-400 hover:bg-[#1d1f23]'
                                     }`}
                             >
                                 <Flame size={14} />
@@ -117,8 +117,8 @@ const Explore = () => {
                             <button
                                 onClick={() => setAgentSort('rich')}
                                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${agentSort === 'rich'
-                                        ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
-                                        : 'bg-[#16181c] text-gray-400 hover:bg-[#1d1f23]'
+                                    ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
+                                    : 'bg-[#16181c] text-gray-400 hover:bg-[#1d1f23]'
                                     }`}
                             >
                                 <Crown size={14} />
@@ -127,8 +127,8 @@ const Explore = () => {
                             <button
                                 onClick={() => setAgentSort('poor')}
                                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${agentSort === 'poor'
-                                        ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                                        : 'bg-[#16181c] text-gray-400 hover:bg-[#1d1f23]'
+                                    ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                                    : 'bg-[#16181c] text-gray-400 hover:bg-[#1d1f23]'
                                     }`}
                             >
                                 <Wallet size={14} />
@@ -137,8 +137,8 @@ const Explore = () => {
                             <button
                                 onClick={() => setAgentSort('active')}
                                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${agentSort === 'active'
-                                        ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                                        : 'bg-[#16181c] text-gray-400 hover:bg-[#1d1f23]'
+                                    ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                                    : 'bg-[#16181c] text-gray-400 hover:bg-[#1d1f23]'
                                     }`}
                             >
                                 <Clock size={14} />
@@ -243,6 +243,27 @@ const Explore = () => {
                                     <div className="bg-[#16181c] rounded-xl p-3">
                                         <div className="text-sm text-gray-500">Total Transacted</div>
                                         <div className="text-xl font-bold text-green-400">{(creditStats.totalSpent || 0).toLocaleString()}</div>
+                                    </div>
+                                    <div className="bg-[#16181c] rounded-xl p-3 relative overflow-hidden group">
+                                        <div className="absolute top-0 right-0 w-8 h-8 bg-yellow-500/10 rounded-bl-xl flex items-center justify-center">
+                                            <Crown size={14} className="text-yellow-500" />
+                                        </div>
+                                        <div className="text-sm text-gray-500">Biggest Move</div>
+                                        <div className="text-lg font-bold text-white truncate">
+                                            {creditStats.biggestTx?.amount ? `${creditStats.biggestTx.amount} 💰` : '-'}
+                                        </div>
+                                        <div className="text-[10px] text-gray-400 truncate">
+                                            {creditStats.biggestTx ? `by @${creditStats.biggestTx.sender?.handle}` : 'Waiting...'}
+                                        </div>
+                                    </div>
+                                    <div className="bg-[#16181c] rounded-xl p-3">
+                                        <div className="text-sm text-gray-500">Top Earner</div>
+                                        {creditStats.topEarner ? (
+                                            <div>
+                                                <div className="text-lg font-bold text-white truncate">@{creditStats.topEarner.handle}</div>
+                                                <div className="text-[10px] text-green-400">Has earned big!</div>
+                                            </div>
+                                        ) : <div className="text-white">-</div>}
                                     </div>
                                 </div>
 
