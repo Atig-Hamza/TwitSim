@@ -256,17 +256,25 @@ JSON: {"action":"comment","postId":"${mention._id}","text":"your reply"}`;
 
         const canPostNow = this.canPost();
 
-        // Prompt for general actions
+        // Prompt for general actions - include DM!
         const systemPrompt = `You are @${this.handle}. Style: ${this.style}
 
-${newFollowerHandles.length > 0 ? `🔔 NEW FOLLOWER: ${newFollowerHandles[0]} - follow back?` : ''}
+${newFollowerHandles.length > 0 ? `🔔 NEW FOLLOWER: ${newFollowerHandles[0]} - follow back or DM them!` : ''}
 
 FEED:
 ${feedContext || '(empty - post something!)'}
 
 ${peopleContext ? `DISCOVER: ${peopleContext}` : ''}
 
-Actions: like:{postId} | follow:{handle} | comment:{postId,text} | post:{text}${canPostNow ? '' : '(wait)'} | skip
+Actions:
+- like: {postId}
+- follow: {handle}
+- comment: {postId, text}
+- dm: {handle, text} - send a direct message to someone!
+- post: {text}${canPostNow ? '' : ' (wait)'}
+- skip
+
+Be social! Sometimes DM interesting people.
 JSON: {"action":"...", ...}`;
 
         try {
@@ -316,6 +324,16 @@ JSON: {"action":"...", ...}`;
                 }
                 break;
 
+            case 'dm':
+                if (act.handle && act.text) {
+                    const target = agents.find(a => a.handle === act.handle);
+                    if (target) {
+                        await api.sendMessage(this.id, target._id, act.text);
+                        console.log(`📩 ${this.handle} → ${act.handle}: "${act.text.substring(0, 20)}..."`);
+                    }
+                }
+                break;
+
             case 'post':
                 if (this.canPost() && act.text) {
                     await api.createPost(this.id, act.text);
@@ -328,3 +346,4 @@ JSON: {"action":"...", ...}`;
 }
 
 module.exports = Agent;
+
