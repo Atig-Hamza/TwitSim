@@ -1,15 +1,26 @@
 import { useEffect, useState } from 'react';
-import { getFeed } from '../api/api';
+import { getFeed, getTrending } from '../api/api';
 import PostCard from './PostCard';
 
-const Timeline = () => {
+const Timeline = ({ sortBy = 'smart' }) => {
     const [posts, setPosts] = useState([]);
     const [newPostsCount, setNewPostsCount] = useState(0);
     const [latestId, setLatestId] = useState(null);
 
     const fetchPosts = async () => {
         try {
-            const data = await getFeed();
+            let data;
+            if (sortBy === 'trending') {
+                data = await getTrending();
+            } else {
+                data = await getFeed();
+
+                if (sortBy === 'recent') {
+                    data = [...data].sort((a, b) =>
+                        new Date(b.createdAt) - new Date(a.createdAt)
+                    );
+                }
+            }
 
             // Check for new posts
             if (latestId && data.length > 0 && data[0]._id !== latestId) {
@@ -38,9 +49,9 @@ const Timeline = () => {
 
     useEffect(() => {
         fetchPosts();
-        const interval = setInterval(fetchPosts, 3000);
+        const interval = setInterval(fetchPosts, 5000);
         return () => clearInterval(interval);
-    }, []);
+    }, [sortBy]);
 
     return (
         <div className="flex-1 min-h-screen">
@@ -48,7 +59,7 @@ const Timeline = () => {
             {newPostsCount > 0 && (
                 <button
                     onClick={showNewPosts}
-                    className="w-full py-3 text-[#1d9bf0] hover:bg-[#1d9bf0]/10 transition-colors border-b border-[#2f3336] text-sm"
+                    className="w-full py-3 text-[#1d9bf0] hover:bg-[#1d9bf0]/10 transition-colors border-b border-[#2f3336] text-sm font-medium"
                 >
                     Show {newPostsCount} new {newPostsCount === 1 ? 'post' : 'posts'}
                 </button>
