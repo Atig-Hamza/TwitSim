@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import { getAllConversations, getConversation, getTransactionsBetween } from '../api/api';
-import { MessageCircle, ArrowLeft, Send, Coins, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { MessageCircle, ArrowLeft, Send, Coins, ArrowUpRight, ArrowDownRight, ArrowRight } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 const Messages = () => {
@@ -17,7 +17,8 @@ const Messages = () => {
             setConversations(data);
         };
         fetchConversations();
-        const interval = setInterval(fetchConversations, 10000);
+        // Poll every 3 seconds for real-time updates
+        const interval = setInterval(fetchConversations, 3000);
         return () => clearInterval(interval);
     }, []);
 
@@ -34,7 +35,8 @@ const Messages = () => {
         };
         fetchMessages();
         if (selectedConvo) {
-            const interval = setInterval(fetchMessages, 5000);
+            // Poll every 2 seconds when viewing a conversation
+            const interval = setInterval(fetchMessages, 2000);
             return () => clearInterval(interval);
         }
     }, [selectedConvo]);
@@ -166,26 +168,28 @@ const Messages = () => {
                                         </div>
                                     ) : (
                                         // Transaction card
-                                        <div key={item._id} className="flex justify-center">
-                                            <div className="bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-500/30 rounded-xl px-4 py-3 inline-flex items-center gap-3">
-                                                <Link to={`/profile/${item.sender?.handle}`} className="flex items-center gap-2">
-                                                    <img src={item.sender?.avatar} alt="" className="w-6 h-6 rounded-full" />
-                                                    <span className="text-sm text-red-400">@{item.sender?.handle}</span>
-                                                </Link>
-
-                                                <div className="flex items-center gap-1 bg-black/30 px-2 py-1 rounded-full">
-                                                    <ArrowUpRight size={12} className="text-red-400" />
-                                                    <span className="font-bold text-yellow-400">{item.amount}</span>
-                                                    <Coins size={12} className="text-yellow-400" />
-                                                    <ArrowDownRight size={12} className="text-green-400" />
+                                        <div key={item._id} className="flex justify-center my-4 w-full">
+                                            <div className="bg-[#191b1f] border border-yellow-500/30 rounded-lg p-3 text-center min-w-[500px] shadow-lg shadow-black/50">
+                                                <div className="flex items-center justify-center gap-2 mb-1">
+                                                    <Coins size={16} className="text-yellow-400" />
+                                                    <span className="text-yellow-400 font-bold text-lg">
+                                                        {item.amount} Coins
+                                                    </span>
                                                 </div>
 
-                                                <Link to={`/profile/${item.receiver?.handle}`} className="flex items-center gap-2">
-                                                    <img src={item.receiver?.avatar} alt="" className="w-6 h-6 rounded-full" />
-                                                    <span className="text-sm text-green-400">@{item.receiver?.handle}</span>
-                                                </Link>
+                                                <div className="text-xs text-gray-400 flex items-center justify-center gap-2 mb-2">
+                                                    <span className="text-gray-300">@{item.sender?.handle}</span>
+                                                    <ArrowRight size={12} className="text-gray-500" />
+                                                    <span className="text-gray-300">@{item.receiver?.handle}</span>
+                                                </div>
 
-                                                <div className="text-xs text-gray-500">
+                                                {item.note && (
+                                                    <div className="text-xs text-gray-400 italic bg-black/30 px-2 py-1 rounded inline-block max-w-[200px] truncate">
+                                                        "{item.note}"
+                                                    </div>
+                                                )}
+
+                                                <div className="text-[10px] text-gray-600 mt-2">
                                                     {formatDistanceToNow(new Date(item.createdAt), { addSuffix: true })}
                                                 </div>
                                             </div>
