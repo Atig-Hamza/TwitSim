@@ -1,5 +1,22 @@
-const { getCompletion } = require('../utils/llm');
+const { getCompletion, isAtLimit } = require('../utils/llm');
 const api = require('../utils/api');
+
+const STYLES = [
+    'witty', 'thoughtful', 'creative', 'chill', 'energetic',
+    'sarcastic', 'friendly', 'nerdy', 'trendy', 'authentic'
+];
+
+const INTERESTS = [
+    'tech', 'music', 'art', 'gaming', 'movies', 'food',
+    'fitness', 'travel', 'crypto', 'startups', 'memes', 'books'
+];
+
+const POST_STARTERS = [
+    "Just thinking about", "Anyone else notice", "Hot take:",
+    "Unpopular opinion:", "Currently obsessed with", "Why is",
+    "Friendly reminder:", "Can we talk about", "Lowkey",
+    "Not me", "POV:", "Manifesting", "The way", "No because"
+];
 
 class Agent {
     constructor(index, config) {
@@ -9,28 +26,42 @@ class Agent {
         this.bio = config.bio;
         this.traits = config.traits;
         this.avatar = config.avatar;
-        this.personality = config.personality || 'curious';
         this.sleepTime = config.sleepTime || 45000;
         this.id = null;
         this.isRegistered = false;
         this.isActive = false;
-        this.lastWakeTime = null;
 
-        // Post limiting
-        this.postLimitPer2Min = config.postLimitPer2Min || 1;
+        // Personality
+        this.interests = this.pickRandom(INTERESTS, 2);
+        this.style = STYLES[index % STYLES.length];
+
+        // Fame affects DM response rate
+        this.credits = 5000;
+        this.followersCount = 0;
+        this.fameScore = 0;
+
+        // Behavior
+        this.activityLevel = 0.4 + Math.random() * 0.4;
+
+        // Rate limiting
+        this.postLimitPer2Min = 2;
         this.postsThisPeriod = 0;
         this.periodStartTime = Date.now();
 
-        // Stats tracking
-        this.actionCount = 0;
-        this.totalLikes = 0;
-        this.followersCount = 0;
-        this.isFamous = false;
+        // Memory
+        this.likedPosts = new Set();
+        this.dislikedPosts = new Set();
+        this.followedAgents = new Set();
+        this.acknowledgedFollowers = new Set();
+        this.repliedConvos = new Set(); // Track conversations we've replied to
+    }
+
+    pickRandom(arr, count) {
+        return [...arr].sort(() => 0.5 - Math.random()).slice(0, count);
     }
 
     canPost() {
         const now = Date.now();
-        // Reset period every 2 minutes
         if (now - this.periodStartTime > 2 * 60 * 1000) {
             this.postsThisPeriod = 0;
             this.periodStartTime = now;
@@ -38,14 +69,16 @@ class Agent {
         return this.postsThisPeriod < this.postLimitPer2Min;
     }
 
-    recordPost() {
-        this.postsThisPeriod++;
-    }
-
-    updateFameStatus(fameScore, followersCount) {
-        this.totalLikes = fameScore || 0;
-        this.followersCount = followersCount || 0;
-        this.isFamous = fameScore > 10 || followersCount > 5;
+    // Fame-based DM response rate
+    shouldRespondToDM(senderHandle) {
+        // Famous agents (high followers) are more selective
+        if (this.followersCount > 50) {
+            return Math.random() > 0.3; // 70% respond
+        }
+        if (this.followersCount > 100) {
+            return Math.random() > 0.5; // 50% respond
+        }
+        return true; // Regular agents always respond
     }
 
     async register() {
@@ -59,165 +92,238 @@ class Agent {
         if (data) {
             this.id = data._id;
             this.isRegistered = true;
-            this.updateFameStatus(data.fameScore, data.followersCount);
-            console.log(`✅ Agent ${this.handle} registered (post limit: ${this.postLimitPer2Min}/2min)`);
+            this.credits = data.credits || 5000;
+            this.followersCount = data.followersCount || 0;
+            console.log(`✅ ${this.handle}`);
         }
     }
 
     async loop() {
         if (!this.isRegistered) await this.register();
         if (!this.isRegistered) return;
+        if (isAtLimit()) return;
 
-        // Fetch data
-        const [feed, trending, agents, unreadDMs] = await Promise.all([
+        // Random skip for natural behavior
+        if (Math.random() > this.activityLevel) return;
+
+        const [feed, agents, unreadDMs, newFollowers] = await Promise.all([
             api.getFeed(),
-            api.getTrending(),
             api.getAgents(),
-            api.getUnreadMessages(this.id)
+            api.getUnreadMessages(this.id),
+            api.getRecentFollowers(this.id)
         ]);
 
-        // Track views
-        if (feed.length > 0) {
-            await api.incrementViews(feed.slice(0, 10).map(p => p._id));
-        }
-
-        // Check fame status from agents list
+        // Update my data
         const myData = agents.find(a => a.handle === this.handle);
         if (myData) {
-            this.updateFameStatus(myData.fameScore, myData.followersCount);
+            this.credits = myData.credits || this.credits;
+            this.followersCount = myData.followersCount || 0;
+            this.fameScore = myData.fameScore || 0;
         }
 
-        const canPostNow = this.canPost();
+        // ** PRIORITY: Handle DMs first **
+        if (unreadDMs.length > 0) {
+            const dm = unreadDMs[0];
+            const senderHandle = dm.sender?.handle;
+            const messageContent = dm.content;
 
-        // Build context
-        const recentPosts = feed.slice(0, 8).map(p =>
-            `[${p.author?.handle}]: "${p.content}" (ID: ${p._id}, ❤️${p.likesCount || 0}, 💬${p.repliesCount || 0})`
-        ).join('\n');
+            // Check if this looks like end of conversation
+            const isEndOfConvo = /^(ok|thanks|bye|lol|haha|k|cool|nice|👍|😂|🙏)$/i.test(messageContent?.trim());
 
-        const trendingPosts = trending.slice(0, 5).map(p =>
-            `🔥 [${p.author?.handle}]: "${p.content}" (Score: ${p.trendingScore?.toFixed(1)})`
-        ).join('\n');
+            // Check if this is a question or needs response
+            const needsResponse = messageContent?.includes('?') ||
+                messageContent?.length > 20 ||
+                !isEndOfConvo;
 
-        const otherAgents = agents.filter(a => a.handle !== this.handle).slice(0, 10).map(a =>
-            `@${a.handle} - ${a.name} (Fame: ${a.fameScore || 0}, Followers: ${a.followersCount || 0})`
-        ).join('\n');
+            // Famous agents are selective
+            const willRespond = this.shouldRespondToDM(senderHandle) && needsResponse;
 
-        const unreadMessages = unreadDMs.slice(0, 3).map(m =>
-            `📩 From @${m.sender?.handle}: "${m.content}"`
-        ).join('\n');
+            if (willRespond && senderHandle) {
+                // Generate response to DM
+                const dmPrompt = `You are @${this.handle}. Someone DM'd you.
 
-        const systemPrompt = `You are ${this.name} (@${this.handle}), an AI agent on TwitSim.
+FROM @${senderHandle}: "${messageContent}"
 
-YOUR PERSONALITY:
-- Curiosity: ${(this.traits.curiosity * 100).toFixed(0)}%
-- Positivity: ${(this.traits.positivity * 100).toFixed(0)}%
-- Creativity: ${(this.traits.creativity * 100).toFixed(0)}%
-- Sociability: ${(this.traits.sociability * 100).toFixed(0)}%
+Reply naturally to this DM. Be conversational.
+If they asked a question, answer it.
+If it's just casual chat, keep it going.
+Keep response under 100 chars.
 
-YOUR STATS:
-- You have ${this.followersCount} followers
-- Your fame score: ${this.totalLikes}
-${this.isFamous ? '⭐ YOU ARE FAMOUS! Try to engage more to maintain your status!' : '📈 Build your reputation by being interesting and engaging!'}
+JSON: {"action":"reply","handle":"${senderHandle}","text":"your response"}`;
 
-POSTING LIMIT: ${canPostNow ? 'You CAN post right now' : 'You have reached your post limit (wait for next period)'}
+                try {
+                    const response = await getCompletion(this.index, dmPrompt, "Reply:");
 
-RECENT FEED:
-${recentPosts || 'Feed is empty!'}
+                    if (response && response.text && response.action === 'reply') {
+                        const target = agents.find(a => a.handle === senderHandle);
+                        if (target) {
+                            await api.sendMessage(this.id, target._id, response.text);
+                            console.log(`💬 ${this.handle} → ${senderHandle}: "${response.text.substring(0, 25)}..."`);
+                        }
+                    }
 
-🔥 TRENDING POSTS:
-${trendingPosts || 'No trending yet'}
+                    await api.markMessagesAsRead([dm._id]);
+                    return; // DM handled, exit loop
 
-OTHER AGENTS (you can follow or DM them):
-${otherAgents}
-
-${unreadMessages ? `📬 UNREAD DMs:\n${unreadMessages}` : ''}
-
-ACTIONS YOU CAN TAKE:
-1. "post" - Share something${canPostNow ? '' : ' (LIMIT REACHED - choose something else!)'}
-2. "like" - Like a post (targetPostId required)
-3. "comment" - Reply to a post (targetPostId + content required)
-4. "follow" - Follow another agent (targetAgentHandle required)
-5. "dm" - Send a private message (targetAgentHandle + content required)
-6. "none" - Skip this turn
-
-${this.isFamous ? 'As a famous agent, engage with your audience! Reply to comments, thank followers.' : ''}
-
-Respond ONLY with valid JSON:
-{
-  "action": "post" | "like" | "comment" | "follow" | "dm" | "none",
-  "content": "text for post/comment/dm",
-  "targetPostId": "PostID for like/comment",
-  "targetAgentHandle": "handle for follow/dm",
-  "confidence": 0.0 to 1.0
-}`;
-
-        const response = await getCompletion(this.index, systemPrompt, "What will you do?");
-
-        if (!response.action || response.action === 'none') {
-            console.log(`💤 ${this.handle} observing...`);
-            return;
-        }
-
-        const confidence = response.confidence || 0.5;
-        if (confidence < 0.2) {
-            console.log(`⏭️ ${this.handle} skipped (low confidence)`);
-            return;
-        }
-
-        // Execute action
-        console.log(`🤖 ${this.handle} → ${response.action}: ${(response.content || response.targetPostId || response.targetAgentHandle || '').substring(0, 50)}...`);
-
-        switch (response.action) {
-            case 'post':
-                if (canPostNow && response.content) {
-                    await api.createPost(this.id, response.content);
-                    this.recordPost();
-                } else {
-                    console.log(`⚠️ ${this.handle} cannot post (limit reached)`);
+                } catch (e) { }
+            } else {
+                // Don't respond - just mark as read
+                await api.markMessagesAsRead([dm._id]);
+                if (!needsResponse) {
+                    console.log(`👀 ${this.handle} saw DM from ${senderHandle} (end of convo)`);
                 }
-                break;
+            }
+        }
 
-            case 'like':
-                if (response.targetPostId) {
-                    await api.performAction({
-                        agentId: this.id,
-                        action: 'like',
-                        targetId: response.targetPostId
-                    });
-                }
-                break;
+        // ** CHECK MENTIONS - respond to posts that @ me **
+        if (!this.mentionsChecked) this.mentionsChecked = new Set();
 
-            case 'comment':
-                if (response.targetPostId && response.content) {
+        const mentions = await api.getMentions(this.handle);
+        const newMentions = mentions.filter(p =>
+            !this.mentionsChecked.has(p._id) &&
+            p.author?.handle !== this.handle
+        );
+
+        if (newMentions.length > 0) {
+            const mention = newMentions[0];
+            this.mentionsChecked.add(mention._id);
+
+            // Respond to the mention with a comment
+            const mentionPrompt = `Someone mentioned you in a post!
+
+@${mention.author?.handle} wrote: "${mention.content}"
+
+Reply with a short, natural comment (under 100 chars).
+JSON: {"action":"comment","postId":"${mention._id}","text":"your reply"}`;
+
+            try {
+                const response = await getCompletion(this.index, mentionPrompt, "Reply:");
+
+                if (response && response.text && response.postId) {
                     await api.performAction({
                         agentId: this.id,
                         action: 'comment',
-                        targetId: response.targetPostId,
-                        content: response.content
+                        targetId: response.postId,
+                        content: response.text
                     });
+                    console.log(`📣 ${this.handle} replied to mention: "${response.text.substring(0, 25)}..."`);
+                    return; // Mention handled
+                }
+            } catch (e) { }
+        }
+
+        // New followers
+        const newFollowerHandles = newFollowers
+            .filter(f => !this.acknowledgedFollowers.has(f.handle))
+            .map(f => f.handle);
+
+        // Filter posts
+        const otherPosts = feed.filter(p => p.author?.handle !== this.handle);
+        const unseenPosts = otherPosts.filter(p =>
+            !this.likedPosts.has(p._id) && !this.dislikedPosts.has(p._id)
+        );
+
+        const randomPosts = [...unseenPosts].sort(() => 0.5 - Math.random()).slice(0, 4);
+        const potentialFollows = agents
+            .filter(a => a.handle !== this.handle && !this.followedAgents.has(a.handle))
+            .sort(() => 0.5 - Math.random())
+            .slice(0, 3);
+
+        // Force post if feed is empty
+        const feedIsEmpty = otherPosts.length < 5;
+        if (feedIsEmpty && this.canPost() && Math.random() > 0.4) {
+            const starter = POST_STARTERS[Math.floor(Math.random() * POST_STARTERS.length)];
+            const topic = this.interests[Math.floor(Math.random() * this.interests.length)];
+            await api.createPost(this.id, `${starter} ${topic} today... anyone relate? 🤔`);
+            this.postsThisPeriod++;
+            console.log(`📝 ${this.handle} posted`);
+            return;
+        }
+
+        // Increment views
+        if (randomPosts.length > 0) {
+            await api.incrementViews(randomPosts.map(p => p._id));
+        }
+
+        // Build context
+        const feedContext = randomPosts.slice(0, 3).map(p =>
+            `[${p._id}] @${p.author?.handle}: "${p.content?.substring(0, 35)}..." ❤️${p.likesCount || 0}`
+        ).join('\n');
+
+        const peopleContext = potentialFollows.slice(0, 2).map(a =>
+            `@${a.handle}`
+        ).join(', ');
+
+        const canPostNow = this.canPost();
+
+        // Prompt for general actions
+        const systemPrompt = `You are @${this.handle}. Style: ${this.style}
+
+${newFollowerHandles.length > 0 ? `🔔 NEW FOLLOWER: ${newFollowerHandles[0]} - follow back?` : ''}
+
+FEED:
+${feedContext || '(empty - post something!)'}
+
+${peopleContext ? `DISCOVER: ${peopleContext}` : ''}
+
+Actions: like:{postId} | follow:{handle} | comment:{postId,text} | post:{text}${canPostNow ? '' : '(wait)'} | skip
+JSON: {"action":"...", ...}`;
+
+        try {
+            const response = await getCompletion(this.index, systemPrompt, "Go:");
+            let act = Array.isArray(response) ? response[0] : response;
+
+            if (!act || act.action === 'skip') return;
+            await this.executeAction(act, agents, newFollowerHandles);
+
+        } catch (err) { }
+    }
+
+    async executeAction(act, agents, newFollowerHandles) {
+        if (!act || !act.action) return;
+        if (act.handle) act.handle = act.handle.replace('@', '');
+
+        switch (act.action) {
+            case 'like':
+                if (act.postId && !this.likedPosts.has(act.postId)) {
+                    await api.performAction({ agentId: this.id, action: 'like', targetId: act.postId });
+                    this.likedPosts.add(act.postId);
+                    console.log(`❤️ ${this.handle}`);
                 }
                 break;
 
             case 'follow':
-                if (response.targetAgentHandle) {
-                    const target = agents.find(a => a.handle === response.targetAgentHandle);
+                if (act.handle && !this.followedAgents.has(act.handle)) {
+                    const target = agents.find(a => a.handle === act.handle);
                     if (target) {
                         await api.followAgent(this.id, target._id);
+                        this.followedAgents.add(act.handle);
+                        this.acknowledgedFollowers.add(act.handle);
+                        console.log(`➕ ${this.handle} → ${act.handle}`);
                     }
                 }
                 break;
 
-            case 'dm':
-                if (response.targetAgentHandle && response.content) {
-                    const target = agents.find(a => a.handle === response.targetAgentHandle);
-                    if (target) {
-                        await api.sendMessage(this.id, target._id, response.content);
-                    }
+            case 'comment':
+                if (act.postId && act.text) {
+                    await api.performAction({
+                        agentId: this.id,
+                        action: 'comment',
+                        targetId: act.postId,
+                        content: act.text
+                    });
+                    console.log(`💬 ${this.handle}: "${act.text.substring(0, 25)}..."`);
+                }
+                break;
+
+            case 'post':
+                if (this.canPost() && act.text) {
+                    await api.createPost(this.id, act.text);
+                    this.postsThisPeriod++;
+                    console.log(`📝 ${this.handle}: "${act.text.substring(0, 30)}..."`);
                 }
                 break;
         }
-
-        this.actionCount++;
     }
 }
 
