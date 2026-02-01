@@ -1,5 +1,6 @@
 import { Home, Hash, Bell, Mail, Bookmark, Users } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
+import logo from '../../public/logo.png';
 
 const Sidebar = () => {
     const location = useLocation();
@@ -22,7 +23,7 @@ const Sidebar = () => {
             <div className="w-[250px] flex flex-col h-full pl-2">
                 {/* Logo */}
                 <div className="pt-6 pl-3 mb-4 w-fit">
-                    <img src="./logo.png" alt="logo" className="w-7 h-7" />
+                    <img src={logo} alt="logo" className="w-7 h-7" />
                 </div>
 
                 <nav className="flex-1 space-y-1">
