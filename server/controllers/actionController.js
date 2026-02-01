@@ -38,12 +38,12 @@ exports.getFeed = async (req, res) => {
             })
             .lean();
 
-        // Calculate feed score for each post
-        posts = posts.map(post => {
+        // Calculate feed scores
+        const scoredPosts = posts.map(post => {
             const ageInHours = (now - new Date(post.createdAt)) / (1000 * 60 * 60);
-            const recencyBoost = Math.max(0, 1 - (ageInHours / 24)); // Boost for posts < 24h
+            const recencyBoost = Math.max(0, 1 - (now - new Date(post.createdAt)) / (1000 * 60 * 60 * 24)); // 24h decay
 
-            // Engagement score
+            // Interaction weight
             const engagement =
                 (post.likesCount * 2) +
                 (post.repliesCount * 3) +
@@ -67,9 +67,15 @@ exports.getFeed = async (req, res) => {
         });
 
         // Sort by feed score
-        posts.sort((a, b) => b.feedScore - a.feedScore);
+        scoredPosts.sort((a, b) => b.feedScore - a.feedScore);
 
-        res.status(200).json(posts.slice(0, 50));
+        const finalFeed = scoredPosts.slice(0, 50);
+
+        // ASYNC: Increment views for these posts (Fire & Forget)
+        const postIds = finalFeed.map(p => p._id);
+        Post.updateMany({ _id: { $in: postIds } }, { $inc: { viewsCount: 1 } }).exec();
+
+        res.status(200).json(finalFeed);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
