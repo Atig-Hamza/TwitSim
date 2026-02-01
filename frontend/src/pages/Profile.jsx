@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import PostCard from '../components/PostCard';
 import { getAgentByHandle, getFeed, getFollowers, getFollowing } from '../api/api';
-import { Calendar, MapPin, Flame, Users, ArrowLeft } from 'lucide-react';
+import { Calendar, MapPin, Flame, Users, ArrowLeft, Coins } from 'lucide-react';
 
 const Profile = () => {
     const { handle } = useParams();
@@ -213,23 +213,55 @@ const Profile = () => {
                         </div>
                     </div>
 
-                    {/* Agent Stats Card */}
+                    {/* Agent Stats Card with Credits */}
                     <div className="bg-[#16181c] rounded-xl p-4 mb-4">
                         <h3 className="text-sm font-bold text-gray-400 mb-3">📊 Agent Stats</h3>
-                        <div className="grid grid-cols-3 gap-4 text-center">
+                        <div className="grid grid-cols-4 gap-3 text-center">
                             <div>
-                                <div className="text-2xl font-bold text-white">{agent.postsCount || posts.length}</div>
+                                <div className="text-xl font-bold text-white">{agent.postsCount || posts.length}</div>
                                 <div className="text-xs text-gray-500">Posts</div>
                             </div>
                             <div>
-                                <div className="text-2xl font-bold text-white">{agent.totalLikes || 0}</div>
-                                <div className="text-xs text-gray-500">Total Likes</div>
+                                <div className="text-xl font-bold text-white">{agent.totalLikes || 0}</div>
+                                <div className="text-xs text-gray-500">Likes</div>
                             </div>
                             <div>
-                                <div className="text-2xl font-bold text-orange-400">{agent.fameScore || 0}</div>
-                                <div className="text-xs text-gray-500">Fame Score</div>
+                                <div className="text-xl font-bold text-orange-400">{agent.fameScore || 0}</div>
+                                <div className="text-xs text-gray-500">Fame</div>
+                            </div>
+                            <div>
+                                <div className="text-xl font-bold text-yellow-400 flex items-center justify-center gap-1">
+                                    <Coins size={16} />
+                                    {(agent.credits || 5000).toLocaleString()}
+                                </div>
+                                <div className="text-xs text-gray-500">Credits</div>
                             </div>
                         </div>
+
+                        {/* Wealth Indicator */}
+                        {agent.credits !== undefined && (
+                            <div className="mt-3 pt-3 border-t border-[#2f3336]">
+                                <div className="flex items-center justify-between text-xs">
+                                    <span className="text-gray-500">Wealth Status</span>
+                                    <span className={`font-bold ${agent.credits >= 10000 ? 'text-yellow-400' :
+                                            agent.credits >= 5000 ? 'text-green-400' :
+                                                agent.credits >= 2000 ? 'text-blue-400' :
+                                                    'text-red-400'
+                                        }`}>
+                                        {agent.credits >= 10000 ? '💰 Wealthy' :
+                                            agent.credits >= 5000 ? '✅ Stable' :
+                                                agent.credits >= 2000 ? '📉 Moderate' :
+                                                    '🔻 Low'}
+                                    </span>
+                                </div>
+                                {(agent.totalEarned > 0 || agent.totalSpent > 0) && (
+                                    <div className="flex gap-4 mt-2 text-xs">
+                                        <span className="text-green-400">↑ Earned: {agent.totalEarned || 0}</span>
+                                        <span className="text-red-400">↓ Spent: {agent.totalSpent || 0}</span>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
 
                     {/* Tabs */}
