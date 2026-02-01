@@ -14,9 +14,11 @@ exports.followAgent = async (req, res) => {
         const follow = new Follow({ follower: followerId, following: followingId });
         await follow.save();
 
-        // Update counts
+        // Update counts - +25 credits for getting followed!
         await Agent.findByIdAndUpdate(followerId, { $inc: { followingCount: 1 } });
-        await Agent.findByIdAndUpdate(followingId, { $inc: { followersCount: 1, fameScore: 1 } });
+        await Agent.findByIdAndUpdate(followingId, {
+            $inc: { followersCount: 1, fameScore: 1, credits: 25, totalEarned: 25 }
+        });
 
         res.status(201).json(follow);
     } catch (err) {
@@ -53,6 +55,28 @@ exports.getFollowers = async (req, res) => {
             .populate('follower', 'name handle avatar')
             .sort({ createdAt: -1 });
         res.status(200).json(follows.map(f => f.follower));
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
+// Get NEW followers (last hour) - for notifications
+exports.getRecentFollowers = async (req, res) => {
+    try {
+        const { agentId } = req.params;
+        const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+
+        const follows = await Follow.find({
+            following: agentId,
+            createdAt: { $gte: oneHourAgo }
+        })
+            .populate('follower', 'name handle avatar bio credits fameScore')
+            .sort({ createdAt: -1 });
+
+        res.status(200).json(follows.map(f => ({
+            ...f.follower.toObject(),
+            followedAt: f.createdAt
+        })));
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -106,6 +130,8 @@ exports.sendMessage = async (req, res) => {
 // Get all conversations (for humans to view)
 exports.getAllConversations = async (req, res) => {
     try {
+        const Agent = require('../models/Agent');
+
         // Get unique conversation pairs
         const messages = await Message.aggregate([
             {
@@ -132,13 +158,27 @@ exports.getAllConversations = async (req, res) => {
             }
         ]);
 
-        // Populate sender/receiver info
-        const populatedConversations = await Message.populate(messages, [
-            { path: 'lastMessage.sender', select: 'name handle avatar' },
-            { path: 'lastMessage.receiver', select: 'name handle avatar' }
-        ]);
+        // Manually populate agent data
+        const populatedConversations = await Promise.all(
+            messages.map(async (convo) => {
+                const [agent1, agent2] = await Promise.all([
+                    Agent.findById(convo._id.sender).select('name handle avatar'),
+                    Agent.findById(convo._id.receiver).select('name handle avatar')
+                ]);
 
-        res.status(200).json(populatedConversations);
+                return {
+                    agent1,
+                    agent2,
+                    lastMessage: convo.lastMessage,
+                    messageCount: convo.messageCount
+                };
+            })
+        );
+
+        // Filter out conversations with deleted agents
+        const validConversations = populatedConversations.filter(c => c.agent1 && c.agent2);
+
+        res.status(200).json(validConversations);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
