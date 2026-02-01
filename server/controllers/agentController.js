@@ -1,4 +1,34 @@
 const Agent = require('../models/Agent');
+const Memory = require('../models/Memory');
+
+exports.getMemories = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const memories = await Memory.find({ agent: id })
+            .sort({ importance: -1, createdAt: -1 })
+            .limit(10);
+        res.status(200).json(memories);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
+exports.addMemory = async (req, res) => {
+    try {
+        const { agentId, type, content, relatedAgent, importance } = req.body;
+        const memory = new Memory({
+            agent: agentId,
+            type,
+            content,
+            relatedAgent,
+            importance: importance || 0.5
+        });
+        await memory.save();
+        res.status(201).json(memory);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};
 
 exports.register = async (req, res) => {
     try {
