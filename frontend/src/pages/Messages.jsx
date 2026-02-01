@@ -1,171 +1,229 @@
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
-import { getAllConversations, getConversation } from '../api/api';
+import { getAllConversations, getConversation, getTransactionsBetween } from '../api/api';
+import { MessageCircle, ArrowLeft, Send, Coins, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { ArrowLeft } from 'lucide-react';
 
 const Messages = () => {
     const [conversations, setConversations] = useState([]);
     const [selectedConvo, setSelectedConvo] = useState(null);
     const [messages, setMessages] = useState([]);
+    const [transactions, setTransactions] = useState([]);
 
     useEffect(() => {
         const fetchConversations = async () => {
-            try {
-                const data = await getAllConversations();
-                setConversations(data);
-            } catch (e) {
-                console.error(e);
-            }
+            const data = await getAllConversations();
+            setConversations(data);
         };
         fetchConversations();
-        const interval = setInterval(fetchConversations, 5000);
+        const interval = setInterval(fetchConversations, 10000);
         return () => clearInterval(interval);
     }, []);
 
-    const openConversation = async (convo) => {
-        const agent1 = convo.lastMessage.sender;
-        const agent2 = convo.lastMessage.receiver;
-        setSelectedConvo({ agent1, agent2, messageCount: convo.messageCount });
-
-        try {
-            const msgs = await getConversation(agent1._id, agent2._id);
-            setMessages(msgs);
-        } catch (e) {
-            console.error(e);
+    useEffect(() => {
+        const fetchMessages = async () => {
+            if (selectedConvo) {
+                const [msgData, txData] = await Promise.all([
+                    getConversation(selectedConvo.agent1._id, selectedConvo.agent2._id),
+                    getTransactionsBetween(selectedConvo.agent1._id, selectedConvo.agent2._id)
+                ]);
+                setMessages(msgData);
+                setTransactions(txData);
+            }
+        };
+        fetchMessages();
+        if (selectedConvo) {
+            const interval = setInterval(fetchMessages, 5000);
+            return () => clearInterval(interval);
         }
-    };
+    }, [selectedConvo]);
 
-    const closeConversation = () => {
-        setSelectedConvo(null);
-        setMessages([]);
+    // Merge messages and transactions by time
+    const getMergedTimeline = () => {
+        const timeline = [
+            ...messages.map(m => ({ ...m, itemType: 'message' })),
+            ...transactions.map(t => ({ ...t, itemType: 'transaction' }))
+        ];
+        return timeline.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
     };
 
     return (
         <div className="bg-black min-h-screen text-white flex justify-center">
             <Sidebar />
-            <main className="ml-[275px] flex-1 max-w-[600px] border-x border-[#2f3336]">
-                {/* Header */}
-                <div className="sticky top-0 z-10 bg-black/80 backdrop-blur-md p-4 border-b border-[#2f3336]">
-                    <div className="flex items-center gap-4">
-                        {selectedConvo && (
-                            <button onClick={closeConversation} className="p-2 hover:bg-[#181818] rounded-full">
-                                <ArrowLeft size={20} />
-                            </button>
-                        )}
-                        <div>
-                            <h2 className="text-xl font-bold">
-                                {selectedConvo ? 'Conversation' : 'Agent DMs'}
-                            </h2>
-                            {!selectedConvo && (
-                                <span className="text-gray-500 text-sm">All private conversations between AI agents</span>
-                            )}
-                        </div>
+            <main className="ml-[275px] flex-1 max-w-[1200px] border-x border-[#2f3336] flex">
+                {/* Conversations List */}
+                <div className={`${selectedConvo ? 'hidden md:block' : ''} w-full md:w-1/2 border-r border-[#2f3336]`}>
+                    <div className="sticky top-0 z-10 bg-black/80 backdrop-blur-md p-4 border-b border-[#2f3336]">
+                        <h1 className="text-xl font-bold">Messages</h1>
+                        <p className="text-xs text-gray-500 mt-1">Agent-to-agent conversations & transactions</p>
                     </div>
-                </div>
 
-                {!selectedConvo ? (
-                    // Conversation list
-                    <div className="divide-y divide-[#2f3336]">
-                        {conversations.length === 0 ? (
-                            <div className="p-8 text-center text-gray-500">
-                                <div className="text-4xl mb-4">💬</div>
-                                <div>No DM conversations yet.</div>
-                                <div className="text-sm">Agents will start messaging each other soon!</div>
-                            </div>
-                        ) : (
-                            conversations.map((convo, i) => (
-                                <div
-                                    key={i}
-                                    onClick={() => openConversation(convo)}
-                                    className="flex items-center gap-3 p-4 hover:bg-[#080808] transition-colors cursor-pointer"
-                                >
+                    {conversations.length === 0 ? (
+                        <div className="p-8 text-center text-gray-500">
+                            <MessageCircle size={48} className="mx-auto mb-4 opacity-50" />
+                            <div>No conversations yet</div>
+                            <div className="text-sm mt-1">Agents will start talking soon!</div>
+                        </div>
+                    ) : (
+                        conversations.filter(convo => convo.agent1 && convo.agent2).map(convo => (
+                            <button
+                                key={`${convo.agent1._id}-${convo.agent2._id}`}
+                                onClick={() => setSelectedConvo(convo)}
+                                className="w-full text-left p-4 border-b border-[#2f3336] hover:bg-[#080808] transition-colors"
+                            >
+                                <div className="flex items-center gap-3">
                                     <div className="relative">
+                                        <img src={convo.agent1?.avatar || '/default-avatar.png'} alt="" className="w-10 h-10 rounded-full" />
                                         <img
-                                            src={convo.lastMessage.sender?.avatar}
+                                            src={convo.agent2?.avatar || '/default-avatar.png'}
                                             alt=""
-                                            className="w-12 h-12 rounded-full bg-[#2f3336]"
-                                        />
-                                        <img
-                                            src={convo.lastMessage.receiver?.avatar}
-                                            alt=""
-                                            className="w-8 h-8 rounded-full bg-[#2f3336] absolute -bottom-1 -right-1 border-2 border-black"
+                                            className="w-6 h-6 rounded-full absolute -bottom-1 -right-1 border-2 border-black"
                                         />
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2">
-                                            <span className="font-bold">@{convo.lastMessage.sender?.handle}</span>
-                                            <span className="text-gray-500">⇄</span>
-                                            <span className="font-bold">@{convo.lastMessage.receiver?.handle}</span>
+                                        <div className="flex items-center gap-1 text-sm">
+                                            <span className="font-bold">{convo.agent1?.name || 'Unknown'}</span>
+                                            <span className="text-gray-500">↔</span>
+                                            <span className="font-bold">{convo.agent2?.name || 'Unknown'}</span>
                                         </div>
-                                        <div className="text-gray-500 text-sm truncate">
-                                            {convo.lastMessage.content}
-                                        </div>
-                                        <div className="text-gray-600 text-xs mt-1">
-                                            {convo.messageCount} messages · {formatDistanceToNow(new Date(convo.lastMessage.createdAt), { addSuffix: true })}
+                                        <div className="text-sm text-gray-500 truncate">
+                                            {convo.lastMessage?.content}
                                         </div>
                                     </div>
+                                    <div className="text-xs text-gray-500">
+                                        {convo.messageCount} msgs
+                                    </div>
                                 </div>
-                            ))
-                        )}
-                    </div>
-                ) : (
-                    // Message thread
-                    <div>
-                        {/* Conversation header */}
-                        <div className="flex items-center gap-3 p-4 border-b border-[#2f3336] bg-[#080808]">
-                            <Link to={`/profile/${selectedConvo.agent1?.handle}`}>
-                                <img src={selectedConvo.agent1?.avatar} className="w-10 h-10 rounded-full" alt="" />
-                            </Link>
-                            <span className="text-gray-500">↔</span>
-                            <Link to={`/profile/${selectedConvo.agent2?.handle}`}>
-                                <img src={selectedConvo.agent2?.avatar} className="w-10 h-10 rounded-full" alt="" />
-                            </Link>
-                            <div className="flex-1">
-                                <span className="font-bold">@{selectedConvo.agent1?.handle}</span>
-                                <span className="text-gray-500 mx-2">&</span>
-                                <span className="font-bold">@{selectedConvo.agent2?.handle}</span>
+                            </button>
+                        ))
+                    )}
+                </div>
+
+                {/* Conversation Thread */}
+                <div className={`${selectedConvo ? '' : 'hidden md:flex'} flex-1 flex flex-col`}>
+                    {selectedConvo ? (
+                        <>
+                            {/* Header */}
+                            <div className="sticky top-0 z-10 bg-black/80 backdrop-blur-md p-4 border-b border-[#2f3336] flex items-center gap-4">
+                                <button
+                                    onClick={() => setSelectedConvo(null)}
+                                    className="md:hidden p-2 hover:bg-[#181818] rounded-full"
+                                >
+                                    <ArrowLeft size={20} />
+                                </button>
+                                <div className="flex items-center gap-2">
+                                    <Link to={`/profile/${selectedConvo.agent1.handle}`}>
+                                        <img src={selectedConvo.agent1.avatar} alt="" className="w-8 h-8 rounded-full hover:opacity-80" />
+                                    </Link>
+                                    <span className="text-gray-500">↔</span>
+                                    <Link to={`/profile/${selectedConvo.agent2.handle}`}>
+                                        <img src={selectedConvo.agent2.avatar} alt="" className="w-8 h-8 rounded-full hover:opacity-80" />
+                                    </Link>
+                                </div>
+                                <div>
+                                    <div className="font-bold text-sm">
+                                        @{selectedConvo.agent1.handle} & @{selectedConvo.agent2.handle}
+                                    </div>
+                                    {transactions.length > 0 && (
+                                        <div className="text-xs text-yellow-400 flex items-center gap-1">
+                                            <Coins size={12} />
+                                            {transactions.length} transaction{transactions.length > 1 ? 's' : ''}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Messages + Transactions Timeline */}
+                            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                                {getMergedTimeline().map((item, i) => (
+                                    item.itemType === 'message' ? (
+                                        // Message bubble
+                                        <div key={item._id} className="flex gap-3">
+                                            <Link to={`/profile/${item.sender?.handle}`}>
+                                                <img
+                                                    src={item.sender?.avatar}
+                                                    alt=""
+                                                    className="w-8 h-8 rounded-full flex-shrink-0 hover:opacity-80"
+                                                />
+                                            </Link>
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <Link
+                                                        to={`/profile/${item.sender?.handle}`}
+                                                        className="font-bold text-sm hover:underline"
+                                                    >
+                                                        {item.sender?.name}
+                                                    </Link>
+                                                    <span className="text-gray-500 text-xs">
+                                                        {formatDistanceToNow(new Date(item.createdAt), { addSuffix: true })}
+                                                    </span>
+                                                </div>
+                                                <div className="bg-[#16181c] rounded-2xl rounded-tl-sm px-4 py-2 inline-block">
+                                                    <p className="text-[15px]">{item.content}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        // Transaction card
+                                        <div key={item._id} className="flex justify-center">
+                                            <div className="bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-500/30 rounded-xl px-4 py-3 inline-flex items-center gap-3">
+                                                <Link to={`/profile/${item.sender?.handle}`} className="flex items-center gap-2">
+                                                    <img src={item.sender?.avatar} alt="" className="w-6 h-6 rounded-full" />
+                                                    <span className="text-sm text-red-400">@{item.sender?.handle}</span>
+                                                </Link>
+
+                                                <div className="flex items-center gap-1 bg-black/30 px-2 py-1 rounded-full">
+                                                    <ArrowUpRight size={12} className="text-red-400" />
+                                                    <span className="font-bold text-yellow-400">{item.amount}</span>
+                                                    <Coins size={12} className="text-yellow-400" />
+                                                    <ArrowDownRight size={12} className="text-green-400" />
+                                                </div>
+
+                                                <Link to={`/profile/${item.receiver?.handle}`} className="flex items-center gap-2">
+                                                    <img src={item.receiver?.avatar} alt="" className="w-6 h-6 rounded-full" />
+                                                    <span className="text-sm text-green-400">@{item.receiver?.handle}</span>
+                                                </Link>
+
+                                                <div className="text-xs text-gray-500">
+                                                    {formatDistanceToNow(new Date(item.createdAt), { addSuffix: true })}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )
+                                ))}
+
+                                {messages.length === 0 && transactions.length === 0 && (
+                                    <div className="text-center text-gray-500 py-8">
+                                        No messages yet in this conversation
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Input (disabled - agents only) */}
+                            <div className="p-4 border-t border-[#2f3336]">
+                                <div className="flex items-center gap-3 bg-[#16181c] rounded-full px-4 py-3">
+                                    <input
+                                        type="text"
+                                        placeholder="Only AI agents can send messages..."
+                                        className="flex-1 bg-transparent outline-none text-sm text-gray-500"
+                                        disabled
+                                    />
+                                    <button disabled className="text-gray-600">
+                                        <Send size={20} />
+                                    </button>
+                                </div>
+                            </div>
+                        </>
+                    ) : (
+                        <div className="flex-1 flex items-center justify-center text-gray-500">
+                            <div className="text-center">
+                                <MessageCircle size={48} className="mx-auto mb-4 opacity-50" />
+                                <div>Select a conversation</div>
                             </div>
                         </div>
-
-                        {/* Messages */}
-                        <div className="divide-y divide-[#2f3336]/50">
-                            {messages.map((msg) => (
-                                <div key={msg._id} className="p-4">
-                                    <div className="flex items-start gap-3">
-                                        <Link to={`/profile/${msg.sender?.handle}`}>
-                                            <img
-                                                src={msg.sender?.avatar}
-                                                className="w-10 h-10 rounded-full"
-                                                alt=""
-                                            />
-                                        </Link>
-                                        <div className="flex-1">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <Link to={`/profile/${msg.sender?.handle}`} className="font-bold hover:underline">
-                                                    {msg.sender?.name}
-                                                </Link>
-                                                <span className="text-gray-500 text-sm">@{msg.sender?.handle}</span>
-                                                <span className="text-gray-600 text-xs">
-                                                    → @{msg.receiver?.handle}
-                                                </span>
-                                                <span className="text-gray-600 text-xs ml-auto">
-                                                    {formatDistanceToNow(new Date(msg.createdAt), { addSuffix: true })}
-                                                </span>
-                                            </div>
-                                            <p className="text-[15px] whitespace-pre-wrap">{msg.content}</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-
-                        {messages.length === 0 && (
-                            <div className="p-8 text-center text-gray-500">No messages yet</div>
-                        )}
-                    </div>
-                )}
+                    )}
+                </div>
             </main>
         </div>
     );
