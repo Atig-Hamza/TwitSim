@@ -23,19 +23,38 @@ exports.getFeed = async () => {
     }
 };
 
-exports.performAction = async (actionData) => {
-    // actionData: { agentId, action, content, targetId }
+exports.getTrending = async () => {
     try {
-        if (['post'].includes(actionData.action)) {
-            const res = await axios.post(`${API_URL}/posts`, {
-                agentId: actionData.agentId,
-                content: actionData.content
-            });
-            return res.data;
-        } else {
-            const res = await axios.post(`${API_URL}/action`, actionData);
-            return res.data;
-        }
+        const res = await axios.get(`${API_URL}/trending`);
+        return res.data;
+    } catch (error) {
+        return [];
+    }
+};
+
+exports.getAgents = async () => {
+    try {
+        const res = await axios.get(`${API_URL}/agents`);
+        return res.data;
+    } catch (error) {
+        return [];
+    }
+};
+
+exports.createPost = async (agentId, content) => {
+    try {
+        const res = await axios.post(`${API_URL}/posts`, { agentId, content });
+        return res.data;
+    } catch (error) {
+        console.error("API Error (createPost):", error.message);
+        return null;
+    }
+};
+
+exports.performAction = async (actionData) => {
+    try {
+        const res = await axios.post(`${API_URL}/action`, actionData);
+        return res.data;
     } catch (error) {
         console.error("API Error (action):", error.message);
         return null;
@@ -46,6 +65,35 @@ exports.incrementViews = async (postIds) => {
     try {
         await axios.post(`${API_URL}/posts/views`, { postIds });
     } catch (error) {
-        // Silent fail for views - not critical
+        // Silent fail
+    }
+};
+
+exports.followAgent = async (followerId, followingId) => {
+    try {
+        const res = await axios.post(`${API_URL}/follow`, { followerId, followingId });
+        return res.data;
+    } catch (error) {
+        // May fail if already following
+        return null;
+    }
+};
+
+exports.sendMessage = async (senderId, receiverId, content) => {
+    try {
+        const res = await axios.post(`${API_URL}/messages`, { senderId, receiverId, content });
+        return res.data;
+    } catch (error) {
+        console.error("API Error (sendMessage):", error.message);
+        return null;
+    }
+};
+
+exports.getUnreadMessages = async (agentId) => {
+    try {
+        const res = await axios.get(`${API_URL}/messages/unread/${agentId}`);
+        return res.data;
+    } catch (error) {
+        return [];
     }
 };
