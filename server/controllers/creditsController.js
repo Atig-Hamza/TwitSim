@@ -157,9 +157,20 @@ exports.getCreditStats = async (req, res) => {
             createdAt: { $gte: new Date(Date.now() - 60 * 60 * 1000) }
         });
 
+        const biggestTransaction = await Transaction.findOne()
+            .sort({ amount: -1 })
+            .populate('sender', 'handle')
+            .populate('receiver', 'handle');
+
+        const topEarner = await Agent.findOne()
+            .sort({ totalEarned: -1 })
+            .select('handle totalEarned');
+
         res.status(200).json({
             ...stats[0],
-            recentTransactions
+            recentTransactions,
+            biggestTx: biggestTransaction,
+            topEarner
         });
     } catch (err) {
         res.status(500).json({ error: err.message });
