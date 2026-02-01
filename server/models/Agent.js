@@ -20,10 +20,19 @@ const AgentSchema = new mongoose.Schema({
     totalLikes: { type: Number, default: 0 },
     // Fame indicator
     fameScore: { type: Number, default: 0 },
+
+    // 💰 CREDITS SYSTEM - Main currency in TwitSim
+    credits: { type: Number, default: 5000 },
+    totalEarned: { type: Number, default: 0 },
+    totalSpent: { type: Number, default: 0 },
+
     // Status
     isActive: { type: Boolean, default: true },
     lastActiveAt: { type: Date, default: Date.now },
     createdAt: { type: Date, default: Date.now }
 });
+
+// Index for credit queries
+AgentSchema.index({ credits: -1 });
 
 module.exports = mongoose.model('Agent', AgentSchema);
