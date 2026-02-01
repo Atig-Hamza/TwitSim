@@ -18,7 +18,6 @@ exports.getFeed = async () => {
         const res = await axios.get(`${API_URL}/feed`);
         return res.data;
     } catch (error) {
-        console.error("API Error (getFeed):", error.message);
         return [];
     }
 };
@@ -41,6 +40,15 @@ exports.getAgents = async () => {
     }
 };
 
+exports.getMentions = async (handle) => {
+    try {
+        const res = await axios.get(`${API_URL}/mentions/${handle}`);
+        return res.data;
+    } catch (error) {
+        return [];
+    }
+};
+
 exports.createPost = async (agentId, content) => {
     try {
         const res = await axios.post(`${API_URL}/posts`, { agentId, content });
@@ -56,7 +64,6 @@ exports.performAction = async (actionData) => {
         const res = await axios.post(`${API_URL}/action`, actionData);
         return res.data;
     } catch (error) {
-        console.error("API Error (action):", error.message);
         return null;
     }
 };
@@ -64,9 +71,7 @@ exports.performAction = async (actionData) => {
 exports.incrementViews = async (postIds) => {
     try {
         await axios.post(`${API_URL}/posts/views`, { postIds });
-    } catch (error) {
-        // Silent fail
-    }
+    } catch (error) { }
 };
 
 exports.followAgent = async (followerId, followingId) => {
@@ -74,8 +79,16 @@ exports.followAgent = async (followerId, followingId) => {
         const res = await axios.post(`${API_URL}/follow`, { followerId, followingId });
         return res.data;
     } catch (error) {
-        // May fail if already following
         return null;
+    }
+};
+
+exports.getRecentFollowers = async (agentId) => {
+    try {
+        const res = await axios.get(`${API_URL}/followers/recent/${agentId}`);
+        return res.data;
+    } catch (error) {
+        return [];
     }
 };
 
@@ -84,7 +97,6 @@ exports.sendMessage = async (senderId, receiverId, content) => {
         const res = await axios.post(`${API_URL}/messages`, { senderId, receiverId, content });
         return res.data;
     } catch (error) {
-        console.error("API Error (sendMessage):", error.message);
         return null;
     }
 };
@@ -92,6 +104,78 @@ exports.sendMessage = async (senderId, receiverId, content) => {
 exports.getUnreadMessages = async (agentId) => {
     try {
         const res = await axios.get(`${API_URL}/messages/unread/${agentId}`);
+        return res.data;
+    } catch (error) {
+        return [];
+    }
+};
+
+exports.markMessagesAsRead = async (messageIds) => {
+    try {
+        await axios.post(`${API_URL}/messages/read`, { messageIds });
+    } catch (error) { }
+};
+
+// Repost & Quote
+exports.repost = async (agentId, postId) => {
+    try {
+        const res = await axios.post(`${API_URL}/repost`, { agentId, postId });
+        return res.data;
+    } catch (error) {
+        return null;
+    }
+};
+
+exports.quotePost = async (agentId, postId, content) => {
+    try {
+        const res = await axios.post(`${API_URL}/quote`, { agentId, postId, content });
+        return res.data;
+    } catch (error) {
+        return null;
+    }
+};
+
+// Memory
+exports.saveMemory = async (memoryData) => {
+    try {
+        const res = await axios.post(`${API_URL}/memory`, memoryData);
+        return res.data;
+    } catch (error) {
+        return null;
+    }
+};
+
+exports.getMemories = async (agentId, type = null, limit = 20) => {
+    try {
+        let url = `${API_URL}/memory/${agentId}?limit=${limit}`;
+        if (type) url += `&type=${type}`;
+        const res = await axios.get(url);
+        return res.data;
+    } catch (error) {
+        return [];
+    }
+};
+
+// 💰 Credits System
+exports.transferCredits = async (senderId, receiverId, amount, note = '', type = 'transfer') => {
+    try {
+        const res = await axios.post(`${API_URL}/credits/transfer`, {
+            senderId,
+            receiverId,
+            amount,
+            note,
+            type
+        });
+        return res.data;
+    } catch (error) {
+        console.error("API Error (transfer):", error.response?.data?.error || error.message);
+        return null;
+    }
+};
+
+exports.getTransactions = async (agentId) => {
+    try {
+        const res = await axios.get(`${API_URL}/credits/transactions/${agentId}`);
         return res.data;
     } catch (error) {
         return [];
