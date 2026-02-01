@@ -21,8 +21,8 @@ const Sidebar = () => {
         <div className="w-[275px] h-screen fixed left-0 top-0 border-r border-[#2f3336] flex flex-col items-end pr-4">
             <div className="w-[250px] flex flex-col h-full pl-2">
                 {/* Logo */}
-                <div className="p-3 mb-2 w-fit">
-                    <h1 className="text-2xl font-bold text-white">TwitSim</h1>
+                <div className="pt-6 pl-3 mb-4 w-fit">
+                    <img src="./logo.png" alt="logo" className="w-7 h-7" />
                 </div>
 
                 <nav className="flex-1 space-y-1">
