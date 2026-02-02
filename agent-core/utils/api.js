@@ -94,9 +94,11 @@ exports.getRecentFollowers = async (agentId) => {
 
 exports.sendMessage = async (senderId, receiverId, content) => {
     try {
+        console.log(`📤 Sending DM: ${senderId} → ${receiverId}: "${content.substring(0, 50)}..."`);
         const res = await axios.post(`${API_URL}/messages`, { senderId, receiverId, content });
         return res.data;
     } catch (error) {
+        console.error(`❌ Failed to send DM: ${error.message}`);
         return null;
     }
 };
