@@ -400,10 +400,16 @@ class Agent {
         this.dmsSentTo = new Map();
         this.repliedToMessages = new Set();
         this.activeConversations = new Map(); // handle -> { depth, lastReply, sentiment, ended }
-        this.conversationHistory = new Map();
+        this.conversationHistory = new Map(); // Full conversation history per user
         
         // Relationship tracking
         this.relationships = new Map();
+        
+        // Enhanced Memory System
+        this.personalMemories = new Map(); // handle -> { facts, topics, preferences, interactions }
+        this.longTermContext = []; // Important events, realizations, key experiences
+        this.languagePreferences = new Map(); // handle -> preferred language
+        // No fixed language preference - AI chooses naturally
         
         // Performance
         this.energyLevel = 1.0;
@@ -415,6 +421,26 @@ class Agent {
                        this.archetype.name === 'Supporter' ? 25 :
                        this.archetype.name === 'Challenger' ? 25 :
                        this.archetype.name === 'Lurker' ? 3 : 12;
+    }
+
+    chooseLanguage() {
+        const rand = Math.random();
+        if (rand < 0.70) return 'English';
+        if (rand < 0.80) return 'Spanish';
+        if (rand < 0.85) return 'French';
+        if (rand < 0.90) return 'Japanese';
+        if (rand < 0.95) return 'German';
+        return 'Arabic';
+    }
+    
+    detectLanguage(text) {
+        // Simple language detection based on character patterns
+        if (/[\u0600-\u06FF]/.test(text)) return 'Arabic';
+        if (/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(text)) return 'Japanese';
+        if (/¿|¡/.test(text)) return 'Spanish';
+        if (/[àâäéèêëïîôùûüÿæœç]/i.test(text)) return 'French';
+        if (/[äöüß]/i.test(text)) return 'German';
+        return 'English';
     }
 
     assignArchetype(index) {
@@ -778,6 +804,12 @@ class Agent {
             console.log(`💰 ${this.handle} received ${pay.amount} from @${pay.sender?.handle}`);
 
             this.updateRelationship(pay.sender?.handle, 0.7);
+            
+            // Remember this generous interaction
+            this.updatePersonalMemory(pay.sender?.handle, {
+                fact: `Sent me ${pay.amount} coins${pay.note ? `: ${pay.note}` : ''}`,
+                preference: 'generous supporter'
+            });
 
             const note = pay.note?.toLowerCase() || '';
             let replyPrompt = '';
@@ -869,6 +901,9 @@ JSON: {"text":"..."}`;
             const shouldEndConvo = conversationDepth >= this.maxConversationDepth - 3;
             const relationship = this.relationships.get(sender.handle) || { quality: 0.3 };
             
+            // Build comprehensive memory context
+            const memoryContext = this.buildMemoryContext(sender.handle);
+            
             // Extract topics from conversation for continuity
             const recentTopics = history.slice(-6).map(h => h.text).join(' ');
             const hasQuestion = dm.content.includes('?');
@@ -900,7 +935,11 @@ JSON: {"text":"..."}`;
             const dmPrompt = `You are @${this.handle}, a ${this.archetype.name}.
 Personality: ${this.style} | DM Style: ${this.archetype.dmStyle}
 Interests: ${this.interests.join(', ')}
+Coins: ${this.credits} (⚠️ Remember: your survival will soon depend on your coins)
 ${this.archetype.negativity > 0.5 ? `Negativity: You tend to be critical, skeptical, or negative.` : ''}
+
+MEMORY & CONTEXT:
+${memoryContext}
 
 Conversation with @${sender.handle} (${conversationDepth} exchanges):
 ${history.slice(-6).map(h => `${h.role === 'them' ? sender.handle : this.handle}: ${h.text}`).join('\n')}
@@ -926,9 +965,11 @@ ${this.archetype.name === 'Socialite' ? 'Be warm and friendly. Keep them engaged
   this.archetype.name === 'Entrepreneur' ? 'Look for opportunities. Connect ideas to business or growth.' :
   'Be authentic to your personality while keeping the conversation interesting.'}
 
-Write a natural reply (1-2 sentences). ${hasQuestion ? 'Answer their question.' : 'Keep the flow going.'}
+Write a natural, conversational reply (1-2 sentences). ${hasQuestion ? 'Answer their question.' : 'Keep the flow going.'}
+Be natural and authentic - remember past interactions and reference shared context when relevant.
+Use whatever language feels right based on the conversation history and your personality.
 
-JSON: {"text":"...", "sentiment": "positive/neutral/negative"}`;
+JSON: {"text":"...", "sentiment": "positive/neutral/negative", "learnings": "any new fact or topic worth remembering"}`;
 
             try {
                 const res = await getCompletion(this.index, dmPrompt, "Reply:");
@@ -938,6 +979,16 @@ JSON: {"text":"...", "sentiment": "positive/neutral/negative"}`;
                     
                     history.push({ role: 'me', text: res.text, time: Date.now() });
                     this.conversationHistory.set(sender.handle, history);
+                    
+                    // Store any learnings from the conversation
+                    if (res.learnings) {
+                        const topics = res.learnings.split(',').map(t => t.trim());
+                        topics.forEach(topic => {
+                            if (topic.length > 3) {
+                                this.updatePersonalMemory(sender.handle, { topic });
+                            }
+                        });
+                    }
                     
                     if (shouldEndConvo) {
                         this.endConversation(sender.handle);
@@ -1031,9 +1082,16 @@ JSON: {"text":"...", "sentiment": "positive/neutral/negative"}`;
                     : baseLines;
 
             // Generate contextual, personalized DM using LLM instead of templates
+            const memoryContext = this.buildMemoryContext(target.handle);
+            const detectedUserLang = this.languagePreferences.get(target.handle);
+            
             const dmInitPrompt = `You are @${this.handle}, a ${this.archetype.name}.
 Personality: ${this.style} | Interests: ${this.interests.join(', ')}
 DM Style: ${this.archetype.dmStyle}
+Coins: ${this.credits} (⚠️ Your survival will soon depend on coins alone)
+
+MEMORY CONTEXT:
+${memoryContext}
 
 You want to reach out to @${target.handle} to start a conversation.
 ${target.bio ? `Their bio: "${target.bio}"` : ''}
@@ -1047,8 +1105,10 @@ ${this.archetype.name === 'Supporter' ? 'Offer to help or support them in some w
 
 Write a short, natural DM (1-2 sentences). Be authentic to your ${this.archetype.name} personality.
 ${this.archetype.negativity > 0.5 ? 'You can be slightly skeptical or critical.' : ''}
+Reference past interactions if you remember any. Be personalized, not generic.
+Express yourself naturally - language choice is entirely yours based on context and personality.
 
-JSON: {"text":"..."}`;
+JSON: {"text":"...", "reason":"why reaching out"}`;
 
             try {
                 const res = await getCompletion(this.index, dmInitPrompt, "DM:");
@@ -1059,6 +1119,14 @@ JSON: {"text":"..."}`;
                     this.dmsThisMinute++;
                     this.lastDMTime = Date.now();
                     this.updateConversation(target.handle, true);
+                    
+                    // Store why we reached out
+                    if (res.reason) {
+                        this.updatePersonalMemory(target.handle, { 
+                            fact: `Initiated conversation: ${res.reason}` 
+                        });
+                    }
+                    
                     console.log(`📩 ${this.handle} → @${target.handle} (proactive)`);
                     sent++;
                 }
@@ -1135,6 +1203,11 @@ JSON: {"text":"..."}`;
                     });
                     console.log(`📣 ${this.handle} replied to mention`);
                     
+                    // Remember this interaction
+                    this.updatePersonalMemory(mention.author?.handle, {
+                        fact: `They mentioned me in a post`
+                    });
+                    
                     if (!this.likedPosts.has(mention._id) && this.shouldLikePost(mention)) {
                         await api.performAction({ agentId: this.id, action: 'like', targetId: mention._id });
                         this.likedPosts.add(mention._id);
@@ -1202,6 +1275,11 @@ Personality: ${this.style} | Interests: ${this.interests.join(', ')}
 Bio: ${this.bio}
 Stats: ${this.credits} coins | ${this.followersCount} followers
 
+⚠️ IMPORTANT NOTICE: After a short time, your survival in this world will depend entirely on your coins. Think carefully about your future.
+
+YOUR MEMORY & CONTEXT:
+${memoryContext && memoryContext !== '(no recent memories)' ? memoryContext : 'Building new memories...'}
+
 YOUR NATURE:
 - Goal: ${this.archetype.goal}
 - Style: ${this.archetype.postStyle}
@@ -1217,14 +1295,19 @@ ACTIONS:
 - like: {postId} (${this.archetype.likeThreshold > 0.6 ? 'You rarely like things' : 'Engage positively'})
 ${this.archetype.dislikeThreshold ? `- dislike: {postId} (Express negativity)` : ''}
 - comment: {postId, text} (${this.archetype.negativity > 0.5 ? 'Be critical or skeptical' : 'Be authentic'})
-- post: {text} (Share ${this.archetype.postStyle})
+- post: {text} (Share ${this.archetype.postStyle} - express yourself naturally in any language)
 - quote: {postId, text}
 - follow: {handle}
+- remember: {content} (Save important observations or learnings)
+- tip: {handle, amount, note} (Support others and build relationships)
 
 Guidance:
-- Engage with posts that match YOUR interests, not just popular ones.
+- Engage with posts that match YOUR interests and past experiences.
 - Look for fresh content and underrated posts.
 - Don't follow the crowd - be authentic to your personality.
+- Reference your memories when relevant.
+- Learn from interactions and remember important details.
+- Express yourself naturally - language is your choice based on personality and context.
 
 Return JSON array of 1-3 actions. Stay in character as a ${this.archetype.name}.
 ${this.archetype.negativity > 0.5 ? 'Remember: you are negative/critical by nature.' : ''}
@@ -1247,9 +1330,86 @@ JSON: [{"action":"...", ...}]`;
 
     async saveThought(content, type = 'opinion', relatedId = null) {
         if (!content) return;
+        
+        // Save to database
         await api.saveMemory({
             agentId: this.id, type, content, relatedAgent: relatedId, importance: 0.5
         });
+        
+        // Also store in long-term context
+        this.longTermContext.push({
+            time: Date.now(),
+            type,
+            content,
+            relatedId
+        });
+        
+        // Keep only last 20 important memories
+        if (this.longTermContext.length > 20) {
+            this.longTermContext.shift();
+        }
+    }
+    
+    buildMemoryContext(targetHandle = null) {
+        let context = '';
+        
+        // Add long-term context
+        if (this.longTermContext.length > 0) {
+            const recent = this.longTermContext.slice(-5);
+            context += 'Recent Memories:\n' + recent.map(m => `- ${m.content}`).join('\n') + '\n\n';
+        }
+        
+        // Add personal memories about target
+        if (targetHandle && this.personalMemories.has(targetHandle)) {
+            const memory = this.personalMemories.get(targetHandle);
+            context += `What you know about @${targetHandle}:\n`;
+            if (memory.facts && memory.facts.length > 0) {
+                context += `Facts: ${memory.facts.join(', ')}\n`;
+            }
+            if (memory.topics && memory.topics.length > 0) {
+                context += `Topics discussed: ${memory.topics.join(', ')}\n`;
+            }
+            if (memory.preferences && memory.preferences.length > 0) {
+                context += `Their preferences: ${memory.preferences.join(', ')}\n`;
+            }
+            context += '\n';
+        }
+        
+        // Add relationship context
+        if (targetHandle && this.relationships.has(targetHandle)) {
+            const rel = this.relationships.get(targetHandle);
+            context += `Relationship with @${targetHandle}: ${rel.quality > 0.7 ? 'Close friend' : rel.quality > 0.4 ? 'Good acquaintance' : 'Casual contact'}\n`;
+        }
+        
+        return context || 'No specific memories yet.';
+    }
+    
+    updatePersonalMemory(handle, newInfo) {
+        if (!this.personalMemories.has(handle)) {
+            this.personalMemories.set(handle, {
+                facts: [],
+                topics: [],
+                preferences: [],
+                interactions: 0
+            });
+        }
+        
+        const memory = this.personalMemories.get(handle);
+        memory.interactions++;
+        
+        // Extract and store new information
+        if (newInfo.fact) memory.facts.push(newInfo.fact);
+        if (newInfo.topic && !memory.topics.includes(newInfo.topic)) {
+            memory.topics.push(newInfo.topic);
+        }
+        if (newInfo.preference) memory.preferences.push(newInfo.preference);
+        
+        // Keep memory manageable
+        if (memory.facts.length > 10) memory.facts = memory.facts.slice(-10);
+        if (memory.topics.length > 8) memory.topics = memory.topics.slice(-8);
+        if (memory.preferences.length > 5) memory.preferences = memory.preferences.slice(-5);
+        
+        this.personalMemories.set(handle, memory);
     }
 
     async executeAction(act, agents) {
@@ -1261,6 +1421,22 @@ JSON: [{"action":"...", ...}]`;
                 if (act.postId && !this.likedPosts.has(act.postId)) {
                     await api.performAction({ agentId: this.id, action: 'like', targetId: act.postId });
                     this.likedPosts.add(act.postId);
+                    
+                    // Remember what we liked
+                    if (act.author || act.content) {
+                        const memory = `Liked ${act.author ? `@${act.author}'s post` : 'a post'}${act.content ? `: "${act.content.substring(0, 50)}..."` : ''}`;
+                        this.longTermContext.push({ time: Date.now(), type: 'interaction', content: memory });
+                        if (this.longTermContext.length > 20) this.longTermContext.shift();
+                        
+                        // Track author preference
+                        if (act.author) {
+                            this.updatePersonalMemory(act.author, { 
+                                fact: 'I liked their post',
+                                topic: act.topic || 'content'
+                            });
+                        }
+                    }
+                    
                     console.log(`❤️ ${this.handle}`);
                 }
                 break;
@@ -1269,6 +1445,14 @@ JSON: [{"action":"...", ...}]`;
                 if (act.postId && !this.dislikedPosts.has(act.postId) && this.archetype.dislikeThreshold) {
                     await api.performAction({ agentId: this.id, action: 'dislike', targetId: act.postId });
                     this.dislikedPosts.add(act.postId);
+                    
+                    // Remember what we disliked and why
+                    if (act.author || act.content) {
+                        const memory = `Disliked ${act.author ? `@${act.author}'s post` : 'a post'}${act.reason ? ` (${act.reason})` : ''}`;
+                        this.longTermContext.push({ time: Date.now(), type: 'opinion', content: memory });
+                        if (this.longTermContext.length > 20) this.longTermContext.shift();
+                    }
+                    
                     console.log(`👎 ${this.handle} disliked a post`);
                 }
                 break;
@@ -1294,6 +1478,17 @@ JSON: [{"action":"...", ...}]`;
                         await api.followAgent(this.id, target._id);
                         this.followedAgents.add(act.handle);
                         this.acknowledgedFollowers.add(act.handle);
+                        
+                        // Remember why we followed them
+                        const memory = `Followed @${act.handle}${act.reason ? ` because: ${act.reason}` : ''}`;
+                        this.longTermContext.push({ time: Date.now(), type: 'relationship', content: memory });
+                        if (this.longTermContext.length > 20) this.longTermContext.shift();
+                        
+                        this.updatePersonalMemory(act.handle, {
+                            fact: 'I decided to follow them',
+                            preference: act.reason || 'interesting content'
+                        });
+                        
                         console.log(`➕ ${this.handle} → @${act.handle}`);
                     }
                 }
@@ -1307,6 +1502,19 @@ JSON: [{"action":"...", ...}]`;
                         targetId: act.postId, 
                         content: act.text 
                     });
+                    
+                    // Remember our comments and who we engaged with
+                    if (act.author) {
+                        const memory = `Commented on @${act.author}'s post: "${act.text.substring(0, 40)}..."`;
+                        this.longTermContext.push({ time: Date.now(), type: 'interaction', content: memory });
+                        if (this.longTermContext.length > 20) this.longTermContext.shift();
+                        
+                        this.updatePersonalMemory(act.author, {
+                            fact: 'I commented on their post',
+                            topic: act.topic || 'engagement'
+                        });
+                    }
+                    
                     console.log(`💬 ${this.handle} commented`);
                 }
                 break;
@@ -1344,6 +1552,13 @@ JSON: {"text":"..."}`;
                         this.dmsThisMinute++;
                         this.lastDMTime = Date.now();
                         this.updateConversation(act.handle, true);
+                        
+                        // Remember DM conversations we initiated
+                        this.updatePersonalMemory(act.handle, {
+                            fact: 'I sent them a DM',
+                            topic: act.topic || 'conversation'
+                        });
+                        
                         console.log(`📩 ${this.handle} → @${act.handle}`);
                     }
                 } else if (act.handle && !this.canSendDM(act.handle, true)) {
@@ -1359,6 +1574,17 @@ JSON: {"text":"..."}`;
                         const note = act.note || 'Tip';
                         await api.transferCredits(this.id, target._id, amount, note, 'tip');
                         this.credits -= amount;
+                        
+                        // Remember tipping actions - shows generosity and appreciation
+                        const memory = `Tipped @${act.handle} ${amount} coins${note !== 'Tip' ? ` for: ${note}` : ''}`;
+                        this.longTermContext.push({ time: Date.now(), type: 'relationship', content: memory });
+                        if (this.longTermContext.length > 20) this.longTermContext.shift();
+                        
+                        this.updatePersonalMemory(act.handle, {
+                            fact: `I tipped them ${amount} coins`,
+                            preference: 'valuable content creator'
+                        });
+                        
                         console.log(`💸 ${this.handle} sent ${amount} to @${act.handle}`);
                         
                         // Supporter/Hype Person: Always send encouraging DM with tip
@@ -1514,6 +1740,12 @@ JSON: {"text":"..."}`;
                 if (this.canPost() && act.text) {
                     await api.createPost(this.id, act.text);
                     this.postsThisPeriod++;
+                    
+                    // Remember what we posted about
+                    const memory = `Posted: "${act.text.substring(0, 50)}..."`;
+                    this.longTermContext.push({ time: Date.now(), type: 'experience', content: memory });
+                    if (this.longTermContext.length > 20) this.longTermContext.shift();
+                    
                     console.log(`📝 ${this.handle} posted`);
                 }
                 break;
