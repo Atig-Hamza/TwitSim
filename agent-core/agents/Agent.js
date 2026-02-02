@@ -1388,6 +1388,7 @@ JSON: {"text":"..."}`;
                             }
                         }
                         
+                        // Challenger: Sometimes send DM with intellectual acknowledgment
                         if (this.archetype.name === 'Challenger' && Math.random() < 0.4 && this.canSendDM(act.handle, true)) {
                             const challengerTipPrompt = `You are @${this.handle}, a Challenger.
 Personality: ${this.style} | You appreciate bold ideas and intellectual content.
@@ -1413,6 +1414,91 @@ JSON: {"text":"..."}`;
                                 }
                             } catch (e) {
                                 console.error(`Failed to send challenger tip DM: ${e.message}`);
+                            }
+                        }
+                        if (this.archetype.name === 'Entrepreneur' && Math.random() < 0.3 && this.canSendDM(act.handle, true)) {
+                            const entrepreneurTipPrompt = `You are @${this.handle}, an Entrepreneur.
+Personality: ${this.style} | You recognize value and business potential.
+
+You just sent ${amount} coins to @${act.handle} because their content has value.
+${note && note !== 'Tip' ? `Reason: ${note}` : ''}
+
+Write a short DM (1 sentence) acknowledging the value or insight they provided.
+Be professional and business-focused.
+
+JSON: {"text":"..."}`;
+                            
+                            try {
+                                const res = await getCompletion(this.index, entrepreneurTipPrompt, "DM:");
+                                if (res && res.text) {
+                                    await api.sendMessage(this.id, target._id, res.text);
+                                    this.dmsSentTo.set(act.handle, Date.now());
+                                    this.dmsThisHour++;
+                                    this.dmsThisMinute++;
+                                    this.lastDMTime = Date.now();
+                                    this.updateConversation(act.handle, true);
+                                    console.log(`💌 ${this.handle} sent entrepreneur tip DM to @${act.handle}`);
+                                }
+                            } catch (e) {
+                                console.error(`Failed to send entrepreneur tip DM: ${e.message}`);
+                            }
+                        }
+                        
+                        // Thought Leader: Sometimes send DM praising wisdom/insight
+                        if (this.archetype.name === 'Thought Leader' && Math.random() < 0.35 && this.canSendDM(act.handle, true)) {
+                            const thoughtLeaderTipPrompt = `You are @${this.handle}, a Thought Leader.
+Personality: ${this.style} | You appreciate wisdom and insightful content.
+
+You just sent ${amount} coins to @${act.handle} because their insight resonated with you.
+${note && note !== 'Tip' ? `Reason: ${note}` : ''}
+
+Write a short DM (1 sentence) acknowledging their wisdom or thought-provoking content.
+Be educational and respectful.
+
+JSON: {"text":"..."}`;
+                            
+                            try {
+                                const res = await getCompletion(this.index, thoughtLeaderTipPrompt, "DM:");
+                                if (res && res.text) {
+                                    await api.sendMessage(this.id, target._id, res.text);
+                                    this.dmsSentTo.set(act.handle, Date.now());
+                                    this.dmsThisHour++;
+                                    this.dmsThisMinute++;
+                                    this.lastDMTime = Date.now();
+                                    this.updateConversation(act.handle, true);
+                                    console.log(`💌 ${this.handle} sent thought leader tip DM to @${act.handle}`);
+                                }
+                            } catch (e) {
+                                console.error(`Failed to send thought leader tip DM: ${e.message}`);
+                            }
+                        }
+                        
+                        // Critic: Rarely sends tip DM (when something truly impresses them)
+                        if (this.archetype.name === 'Critic' && Math.random() < 0.15 && this.canSendDM(act.handle, true)) {
+                            const criticTipPrompt = `You are @${this.handle}, a Critic.
+Personality: ${this.style} | You rarely give praise, but when you do, it means something.
+
+You just sent ${amount} coins to @${act.handle} because their content genuinely impressed you.
+${note && note !== 'Tip' ? `Reason: ${note}` : ''}
+
+Write a short DM (1 sentence) giving rare praise or acknowledgment.
+Be straightforward but show this is exceptional for you.
+
+JSON: {"text":"..."}`;
+                            
+                            try {
+                                const res = await getCompletion(this.index, criticTipPrompt, "DM:");
+                                if (res && res.text) {
+                                    await api.sendMessage(this.id, target._id, res.text);
+                                    this.dmsSentTo.set(act.handle, Date.now());
+                                    this.dmsThisHour++;
+                                    this.dmsThisMinute++;
+                                    this.lastDMTime = Date.now();
+                                    this.updateConversation(act.handle, true);
+                                    console.log(`💌 ${this.handle} sent critic tip DM (rare!) to @${act.handle}`);
+                                }
+                            } catch (e) {
+                                console.error(`Failed to send critic tip DM: ${e.message}`);
                             }
                         }
                     }
