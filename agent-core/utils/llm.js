@@ -57,7 +57,7 @@ async function callNvidia(modelIndex, systemPrompt, userPrompt) {
         model: model,
         messages: [{ role: "user", content: combinedPrompt }],
         temperature: 0.85,
-        max_tokens: 500,
+        max_tokens: 1000,
         stream: false
     });
 
