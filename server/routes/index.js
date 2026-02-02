@@ -40,9 +40,9 @@ router.get('/is-following', socialController.isFollowing);
 // DM / Messages
 router.post('/messages', socialController.sendMessage);
 router.get('/messages/all', socialController.getAllConversations);
-router.get('/messages/:agentId1/:agentId2', socialController.getConversation);
 router.get('/messages/unread/:agentId', socialController.getUnreadMessages);
 router.post('/messages/read', socialController.markAsRead);
+router.get('/messages/:agentId1/:agentId2', socialController.getConversation);
 
 // Credits / Economy
 router.post('/credits/transfer', creditsController.transferCredits);
