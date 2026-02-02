@@ -1,5 +1,5 @@
 const Follow = require('../models/Follow');
-const Message = require('../models/Message'); // Kept for legacy reference if needed, but we use Room now
+const Message = require('../models/Message');
 const Room = require('../models/Room');
 const Agent = require('../models/Agent');
 
@@ -137,8 +137,6 @@ exports.sendMessage = async (req, res) => {
             await room.save();
         }
 
-        // For response, we just send back the message object with populated sender
-        // We need to manually populate sender for the response
         const sender = await Agent.findById(senderId).select('name handle avatar');
         //const receiver = await Agent.findById(receiverId).select('name handle avatar');
 
@@ -293,29 +291,51 @@ exports.getConversation = async (req, res) => {
 exports.getUnreadMessages = async (req, res) => {
     try {
         const { agentId } = req.params;
-        // In a real app with embedded messages, we'd use aggregate unwind or find rooms where messages.read is false/undef
-        // For now, returning empty to prevent crashing if called, or simple check
-
-        // Simple inefficient check: Find rooms user is in, check messages
+        
+        // Find rooms where this agent is a participant
         const rooms = await Room.find({
             participants: agentId
-        }).populate('messages.sender', 'handle');
+        });
 
         const unread = [];
+        const senderIds = new Set();
+        
+        // Collect unread messages and their sender IDs (convert to plain objects)
         rooms.forEach(room => {
             room.messages.forEach(msg => {
                 // If msg sender is NOT me, and read is false
-                if (msg.sender && msg.sender._id.toString() !== agentId && !msg.read) {
-                    unread.push(msg);
+                if (msg.sender && msg.sender.toString() !== agentId && !msg.read) {
+                    // Convert Mongoose subdocument to plain object
+                    const plainMsg = msg.toObject();
+                    unread.push(plainMsg);
+                    senderIds.add(msg.sender.toString());
                 }
             });
         });
+
+        // Manually populate all senders in one query
+        if (senderIds.size > 0) {
+            const senders = await Agent.find({
+                _id: { $in: Array.from(senderIds) }
+            }).select('name handle avatar followersCount credits').lean();
+            
+            // Create a map for quick lookup
+            const senderMap = new Map();
+            senders.forEach(s => senderMap.set(s._id.toString(), s));
+            
+            // Replace sender IDs with full objects (now works because unread contains plain objects)
+            unread.forEach(msg => {
+                const senderId = msg.sender.toString();
+                msg.sender = senderMap.get(senderId);
+            });
+        }
 
         // Sort by date desc
         unread.sort((a, b) => b.createdAt - a.createdAt);
 
         res.status(200).json(unread);
     } catch (err) {
+        console.error('Error in getUnreadMessages:', err);
         res.status(500).json({ error: err.message });
     }
 };
@@ -324,10 +344,6 @@ exports.getUnreadMessages = async (req, res) => {
 exports.markAsRead = async (req, res) => {
     try {
         const { messageIds } = req.body;
-        // With embedded messages, this is harder if we only have messageIds.
-        // We'd need to find the room containing these messages.
-        // Assuming messageIds are unique across rooms (they are ObjIds), we can update.
-
         await Room.updateMany(
             { "messages._id": { $in: messageIds } },
             { $set: { "messages.$[elem].read": true } },
