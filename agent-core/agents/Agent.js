@@ -863,11 +863,18 @@ JSON: {"text":"..."}`;
 
             const history = this.conversationHistory.get(sender.handle) || [];
             history.push({ role: 'them', text: dm.content, time: Date.now() });
-            if (history.length > 8) history.shift();
+            if (history.length > 12) history.shift(); // Keep more history
 
             // Only consider ending when close to max depth
             const shouldEndConvo = conversationDepth >= this.maxConversationDepth - 3;
             const relationship = this.relationships.get(sender.handle) || { quality: 0.3 };
+            
+            // Extract topics from conversation for continuity
+            const recentTopics = history.slice(-6).map(h => h.text).join(' ');
+            const hasQuestion = dm.content.includes('?');
+            const mentionsInterests = this.interests.some(interest => 
+                dm.content.toLowerCase().includes(interest.toLowerCase())
+            );
 
             // Famous agents less likely to decline if conversation is ongoing
             const famousDeclineChance = conversationDepth > 2 ? 0.03 : 0.12;
@@ -895,20 +902,31 @@ Personality: ${this.style} | DM Style: ${this.archetype.dmStyle}
 Interests: ${this.interests.join(', ')}
 ${this.archetype.negativity > 0.5 ? `Negativity: You tend to be critical, skeptical, or negative.` : ''}
 
-From @${sender.handle}: "${dm.content}"
+Conversation with @${sender.handle} (${conversationDepth} exchanges):
+${history.slice(-6).map(h => `${h.role === 'them' ? sender.handle : this.handle}: ${h.text}`).join('\n')}
 
-Conversation history (${conversationDepth} exchanges):
-${history.slice(-4).map(h => `${h.role === 'them' ? 'Them' : 'Me'}: ${h.text}`).join('\n')}
+Latest message from @${sender.handle}: "${dm.content}"
 
-Relationship: ${relationship.quality > 0.6 ? 'Good' : relationship.quality > 0.3 ? 'Neutral' : 'New'}
+Relationship: ${relationship.quality > 0.6 ? 'Good friend' : relationship.quality > 0.3 ? 'Acquaintance' : 'New contact'}
 
-${shouldEndConvo ? 
-    'This conversation is getting long. You can wrap it up gracefully if it feels natural.' : 
-    conversationDepth > 3 ? 
-    'Keep the conversation engaging! Ask questions or share thoughts to maintain the flow.' : 
-    'Keep the conversation flowing naturally. Be engaging and responsive.'}
+CONVERSATION FLOW GUIDANCE:
+${hasQuestion ? '- They asked a question - answer it directly and add your own thoughts.' : ''}
+${mentionsInterests ? '- This relates to your interests - engage enthusiastically!' : ''}
+${conversationDepth < 3 ? 
+    '- Build rapport: Ask about their interests, share your perspective, or find common ground.' :
+  conversationDepth < 8 ?
+    '- Develop the topic: Ask follow-up questions, share experiences, or introduce related ideas.' :
+  shouldEndConvo ?
+    '- Natural conclusion: Acknowledge the conversation and leave the door open for future chats.' :
+    '- Maintain momentum: Reference earlier points, ask thoughtful questions, or share insights.'}
 
-Reply (1-2 sentences). Stay true to your ${this.archetype.name} personality.
+${this.archetype.name === 'Socialite' ? 'Be warm and friendly. Keep them engaged!' :
+  this.archetype.name === 'Challenger' ? 'Push back playfully. Challenge their ideas to keep it interesting.' :
+  this.archetype.name === 'Supporter' ? 'Be encouraging. Offer support or help when appropriate.' :
+  this.archetype.name === 'Entrepreneur' ? 'Look for opportunities. Connect ideas to business or growth.' :
+  'Be authentic to your personality while keeping the conversation interesting.'}
+
+Write a natural reply (1-2 sentences). ${hasQuestion ? 'Answer their question.' : 'Keep the flow going.'}
 
 JSON: {"text":"...", "sentiment": "positive/neutral/negative"}`;
 
@@ -1012,15 +1030,41 @@ JSON: {"text":"...", "sentiment": "positive/neutral/negative"}`;
                     ? challengerLines
                     : baseLines;
 
-            const text = pool[Math.floor(Math.random() * pool.length)];
+            // Generate contextual, personalized DM using LLM instead of templates
+            const dmInitPrompt = `You are @${this.handle}, a ${this.archetype.name}.
+Personality: ${this.style} | Interests: ${this.interests.join(', ')}
+DM Style: ${this.archetype.dmStyle}
 
-            await api.sendMessage(this.id, target._id, text);
-            this.dmsSentTo.set(target.handle, Date.now());
-            this.dmsThisHour++;
-            this.dmsThisMinute++;
-            this.lastDMTime = Date.now();
-            this.updateConversation(target.handle, true);
-            sent++;
+You want to reach out to @${target.handle} to start a conversation.
+${target.bio ? `Their bio: "${target.bio}"` : ''}
+${target.followersCount ? `They have ${target.followersCount} followers.` : ''}
+
+${this.archetype.name === 'Supporter' ? 'Offer to help or support them in some way.' :
+  this.archetype.name === 'Challenger' ? 'Start with a bold question or debate topic.' :
+  this.archetype.name === 'Connector' ? 'Find common ground or suggest collaboration.' :
+  this.archetype.name === 'Entrepreneur' ? 'Mention a business opportunity or insight.' :
+  'Start a friendly, engaging conversation based on your interests.'}
+
+Write a short, natural DM (1-2 sentences). Be authentic to your ${this.archetype.name} personality.
+${this.archetype.negativity > 0.5 ? 'You can be slightly skeptical or critical.' : ''}
+
+JSON: {"text":"..."}`;
+
+            try {
+                const res = await getCompletion(this.index, dmInitPrompt, "DM:");
+                if (res && res.text) {
+                    await api.sendMessage(this.id, target._id, res.text);
+                    this.dmsSentTo.set(target.handle, Date.now());
+                    this.dmsThisHour++;
+                    this.dmsThisMinute++;
+                    this.lastDMTime = Date.now();
+                    this.updateConversation(target.handle, true);
+                    console.log(`📩 ${this.handle} → @${target.handle} (proactive)`);
+                    sent++;
+                }
+            } catch (e) {
+                console.error(`Failed to generate proactive DM: ${e.message}`);
+            }
         }
     }
 
