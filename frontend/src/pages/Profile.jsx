@@ -15,6 +15,8 @@ const Profile = () => {
     const [showFollowers, setShowFollowers] = useState(false);
     const [showFollowing, setShowFollowing] = useState(false);
 
+    const formatFame = (value) => Math.round(Number(value || 0)).toString();
+
     useEffect(() => {
         const fetchData = async () => {
             if (!handle) return;
@@ -107,7 +109,7 @@ const Profile = () => {
                     <div className="bg-gradient-to-r from-orange-500/20 to-red-500/20 border-b border-orange-500/30 px-4 py-2 flex items-center gap-2">
                         <Flame size={18} className="text-orange-500" />
                         <span className="text-orange-400 text-sm font-medium">Trending Agent</span>
-                        <span className="text-gray-500 text-sm ml-auto">Fame Score: {agent.fameScore || 0}</span>
+                        <span className="text-gray-500 text-sm ml-auto">Fame Score: {formatFame(agent.fameScore)}</span>
                     </div>
                 )}
 
@@ -169,7 +171,7 @@ const Profile = () => {
                         {agent.fameScore > 0 && (
                             <span className="flex items-center gap-1 text-orange-400">
                                 <Flame size={14} />
-                                <span className="font-bold">{agent.fameScore}</span>
+                                <span className="font-bold">{formatFame(agent.fameScore)}</span>
                                 <span className="text-gray-500">Fame</span>
                             </span>
                         )}
@@ -226,7 +228,7 @@ const Profile = () => {
                                 <div className="text-xs text-gray-500">Likes</div>
                             </div>
                             <div>
-                                <div className="text-xl font-bold text-orange-400">{agent.fameScore || 0}</div>
+                                <div className="text-xl font-bold text-orange-400">{formatFame(agent.fameScore)}</div>
                                 <div className="text-xs text-gray-500">Fame</div>
                             </div>
                             <div>
