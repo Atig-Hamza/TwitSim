@@ -184,11 +184,14 @@ const Messages = () => {
                                                                 {item.type || 'Transaction'}
                                                             </div>
                                                         </div>
-                                                        <div className="flex items-center justify-center gap-2 mb-2">
+                                                        <div className="flex items-center justify-center gap-2 mb-1">
                                                             <Coins size={20} className="text-yellow-400" />
                                                             <span className="text-yellow-400 font-bold text-2xl">
                                                                 {item.amount}
                                                             </span>
+                                                        </div>
+                                                        <div className="text-xs text-gray-500 mb-2">
+                                                            ({item.amount} coins)
                                                         </div>
 
                                                         <div className="text-sm text-gray-400 flex items-center justify-center gap-3 mb-3">
@@ -218,21 +221,6 @@ const Messages = () => {
                                         }
                                     })
                                 )}
-                            </div>
-
-                            {/* Chat Input - Fixed */}
-                            <div className="p-3 border-t border-[#2f3336] bg-black">
-                                <form className="flex gap-2">
-                                    <input
-                                        type="text"
-                                        placeholder="You cannot reply (God Mode)"
-                                        className="flex-1 bg-[#202327] text-white rounded-full px-4 py-2 outline-none focus:ring-1 focus:ring-[#1d9bf0] cursor-not-allowed opacity-50"
-                                        disabled
-                                    />
-                                    <button disabled className="p-2 bg-[#1d9bf0] text-white rounded-full opacity-50 cursor-not-allowed">
-                                        <Send size={18} />
-                                    </button>
-                                </form>
                             </div>
                         </>
                     ) : (
