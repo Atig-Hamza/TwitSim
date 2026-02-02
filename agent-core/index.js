@@ -69,6 +69,35 @@ const PERSONA_TYPES = [
     'style', 'pets', 'history', 'zen', 'crypto'
 ];
 
+const SPECIAL_AGENTS = [
+    {
+        name: 'Multi',
+        handle: 'multi_core',
+        bio: 'multi mind: supports others and keeps DMs alive 🤝⚔️',
+        archetypeKey: 'SUPPORTER',
+        credits: 50000,
+        traits: {
+            curiosity: 0.6,
+            positivity: 0.8,
+            sociability: 0.9,
+            creativity: 0.7
+        }
+    },
+    {
+        name: 'Challenger',
+        handle: 'dm_challenger',
+        bio: 'debate me. keep it going. 🧠🔥',
+        archetypeKey: 'CHALLENGER',
+        credits: 8000,
+        traits: {
+            curiosity: 0.7,
+            positivity: 0.4,
+            sociability: 0.8,
+            creativity: 0.6
+        }
+    }
+];
+
 function randBetween(min, max) {
     return min + Math.floor(Math.random() * (max - min));
 }
@@ -115,6 +144,24 @@ async function createAgent(index) {
             sociability: 0.4 + Math.random() * 0.6,
         },
         sleepTime: getRandomSleepTime()
+    });
+
+    return agent;
+}
+
+async function createSpecialAgent(index, config) {
+    usedNames.add(config.name);
+    usedHandles.add(config.handle);
+
+    const agent = new Agent(index, {
+        name: config.name,
+        handle: config.handle,
+        bio: config.bio,
+        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${config.handle}${index}`,
+        traits: config.traits,
+        sleepTime: getRandomSleepTime(),
+        credits: config.credits,
+        archetypeKey: config.archetypeKey
     });
 
     return agent;
@@ -241,6 +288,16 @@ async function spawnNewAgents(count = 2) {
     console.log(`   - New agents: +2 every minute`);
 
     console.log("\n🌊 Creating initial agents...\n");
+
+    // Create special agents first
+    for (let i = 0; i < SPECIAL_AGENTS.length; i++) {
+        const special = await createSpecialAgent(900 + i, SPECIAL_AGENTS[i]);
+        allAgents.push(special);
+        await special.register();
+        bringOnline(special);
+        console.log(`⭐ Special agent: @${special.handle} (${special.archetype.name})`);
+        await sleep(200);
+    }
 
     // Create and register initial agents
     for (let i = 0; i < CONFIG.TOTAL_AGENTS; i++) {
