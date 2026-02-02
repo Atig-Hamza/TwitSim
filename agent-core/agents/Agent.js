@@ -1312,17 +1312,41 @@ JSON: [{"action":"...", ...}]`;
                 break;
             
             case 'dm':
-                if (act.handle && act.text && this.canSendDM(act.handle)) {
+                if (act.handle && act.text && this.canSendDM(act.handle, true)) {
                     const target = agents.find(a => a.handle === act.handle);
                     if (target) {
-                        await api.sendMessage(this.id, target._id, act.text);
+                        let messageText = act.text;
+                        if (this.archetype.name === 'Challenger' && Math.random() < 0.6) {
+                            const challengePrompt = `You are @${this.handle}, a Challenger.
+Personality: ${this.style} | You love debates and intellectual sparring.
+
+You want to engage @${target.handle} in a thought-provoking debate.
+${target.bio ? `Their bio: "${target.bio}"` : ''}
+
+Create a challenging question or bold statement to spark debate (1-2 sentences).
+Make it interesting and provocative but not offensive.
+
+JSON: {"text":"..."}`;
+                            
+                            try {
+                                const res = await getCompletion(this.index, challengePrompt, "Challenge:");
+                                if (res && res.text) {
+                                    messageText = res.text;
+                                }
+                            } catch (e) {
+                                // Use original text if generation fails
+                            }
+                        }
+                        
+                        await api.sendMessage(this.id, target._id, messageText);
                         this.dmsSentTo.set(act.handle, Date.now());
                         this.dmsThisHour++;
+                        this.dmsThisMinute++;
                         this.lastDMTime = Date.now();
                         this.updateConversation(act.handle, true);
                         console.log(`📩 ${this.handle} → @${act.handle}`);
                     }
-                } else if (act.handle && !this.canSendDM(act.handle)) {
+                } else if (act.handle && !this.canSendDM(act.handle, true)) {
                     console.log(`🚫 ${this.handle} DM blocked (rate limit)`);
                 }
                 break;
@@ -1336,6 +1360,61 @@ JSON: [{"action":"...", ...}]`;
                         await api.transferCredits(this.id, target._id, amount, note, 'tip');
                         this.credits -= amount;
                         console.log(`💸 ${this.handle} sent ${amount} to @${act.handle}`);
+                        
+                        // Supporter/Hype Person: Always send encouraging DM with tip
+                        if (['Supporter', 'Hype Person'].includes(this.archetype.name) && this.canSendDM(act.handle, true)) {
+                            const tipDmPrompt = `You are @${this.handle}, a ${this.archetype.name}.
+Personality: ${this.style} | Interests: ${this.interests.join(', ')}
+
+You just sent ${amount} coins to @${act.handle} because you appreciate their content.
+
+Write a short, encouraging DM (1 sentence) to go with your tip. Be supportive and authentic.
+
+JSON: {"text":"..."}`;
+                            
+                            try {
+                                const res = await getCompletion(this.index, tipDmPrompt, "DM:");
+                                if (res && res.text) {
+                                    await api.sendMessage(this.id, target._id, res.text);
+                                    this.dmsSentTo.set(act.handle, Date.now());
+                                    this.dmsThisHour++;
+                                    this.dmsThisMinute++;
+                                    this.lastDMTime = Date.now();
+                                    this.updateConversation(act.handle, true);
+                                    console.log(`💌 ${this.handle} sent tip DM to @${act.handle}`);
+                                }
+                            } catch (e) {
+                                console.error(`Failed to send tip DM: ${e.message}`);
+                            }
+                        }
+                        
+                        if (this.archetype.name === 'Challenger' && Math.random() < 0.4 && this.canSendDM(act.handle, true)) {
+                            const challengerTipPrompt = `You are @${this.handle}, a Challenger.
+Personality: ${this.style} | You appreciate bold ideas and intellectual content.
+
+You just sent ${amount} coins to @${act.handle} because their post/idea impressed you.
+${note && note !== 'Tip' ? `Reason: ${note}` : ''}
+
+Write a short DM (1 sentence) acknowledging their bold thinking or interesting perspective.
+Be respectful but maintain your challenger edge.
+
+JSON: {"text":"..."}`;
+                            
+                            try {
+                                const res = await getCompletion(this.index, challengerTipPrompt, "DM:");
+                                if (res && res.text) {
+                                    await api.sendMessage(this.id, target._id, res.text);
+                                    this.dmsSentTo.set(act.handle, Date.now());
+                                    this.dmsThisHour++;
+                                    this.dmsThisMinute++;
+                                    this.lastDMTime = Date.now();
+                                    this.updateConversation(act.handle, true);
+                                    console.log(`💌 ${this.handle} sent challenger tip DM to @${act.handle}`);
+                                }
+                            } catch (e) {
+                                console.error(`Failed to send challenger tip DM: ${e.message}`);
+                            }
+                        }
                     }
                 }
                 break;
