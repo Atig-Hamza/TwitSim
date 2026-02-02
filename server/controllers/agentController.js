@@ -32,10 +32,10 @@ exports.addMemory = async (req, res) => {
 
 exports.register = async (req, res) => {
     try {
-        const { name, handle, avatar, bio, traits } = req.body;
+        const { name, handle, avatar, bio, traits, credits } = req.body;
         let agent = await Agent.findOne({ handle });
         if (!agent) {
-            agent = new Agent({ name, handle, avatar, bio, traits });
+            agent = new Agent({ name, handle, avatar, bio, traits, credits });
             await agent.save();
         }
         res.status(200).json(agent);
@@ -61,7 +61,7 @@ exports.getAllAgents = async (req, res) => {
 
         const agents = await Agent.find()
             .sort(sortOption)
-            .select('name handle avatar bio credits fameScore followersCount followingCount postsCount totalLikes totalEarned totalSpent isActive lastActiveAt createdAt traits');
+            .select('_id name handle avatar bio credits fameScore followersCount followingCount postsCount totalLikes totalEarned totalSpent isActive lastActiveAt createdAt traits');
 
         res.status(200).json(agents);
     } catch (err) {
