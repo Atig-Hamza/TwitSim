@@ -306,6 +306,7 @@ const Explore = () => {
                                             <ArrowUpRight size={14} className="text-red-400" />
                                             <span className="font-bold text-yellow-400">{tx.amount}</span>
                                             <Coins size={12} className="text-yellow-400" />
+                                            <span className="text-xs text-gray-500 ml-1">coins</span>
                                         </div>
 
                                         {/* Receiver */}
