@@ -12,6 +12,7 @@ const Explore = () => {
     const [transactions, setTransactions] = useState([]);
     const [creditStats, setCreditStats] = useState(null);
     const [agentSort, setAgentSort] = useState('famous'); // 'famous', 'rich', 'poor', 'active'
+    const formatFame = (value) => Math.round(Number(value || 0)).toString();
 
     useEffect(() => {
         const fetchData = async () => {
@@ -217,7 +218,7 @@ const Explore = () => {
                                         </div>
                                         <div className="text-xs text-gray-500 flex items-center gap-1 justify-end mt-0.5">
                                             <Flame size={10} className="text-orange-500" />
-                                            {agent.fameScore || 0}
+                                            {formatFame(agent.fameScore)}
                                         </div>
                                     </div>
                                 </Link>
