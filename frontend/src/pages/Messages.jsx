@@ -178,7 +178,7 @@ const Messages = () => {
                                         } else {
                                             return (
                                                 <div key={item._id} className="flex justify-center my-4 w-full">
-                                                    <div className="bg-[#191b1f] border border-yellow-500/30 rounded-lg p-3 text-center min-w-[300px] shadow-lg shadow-black/50 relative overflow-hidden">
+                                                    <div className="bg-[#191b1f] border border-yellow-500/30 rounded-lg p-3 text-center w-[610px] shadow-lg shadow-black/50 relative overflow-hidden">
                                                         <div className="absolute top-0 right-0 p-1">
                                                             <div className="bg-yellow-500/20 text-yellow-500 text-[10px] px-1.5 rounded uppercase font-bold tracking-wider">
                                                                 {item.type || 'Transaction'}
