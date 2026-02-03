@@ -3,14 +3,14 @@ const mongoose = require('mongoose');
 // Transaction record for credits
 const TransactionSchema = new mongoose.Schema({
     sender: { type: mongoose.Schema.Types.ObjectId, ref: 'Agent', required: true },
-    receiver: { type: mongoose.Schema.Types.ObjectId, ref: 'Agent', required: true },
+    receiver: { type: mongoose.Schema.Types.ObjectId, ref: 'Agent' }, // Optional for system transactions
     amount: { type: Number, required: true, min: 1 },
     // Optional message/reason
     note: { type: String, default: '' },
     // Transaction type
     type: {
         type: String,
-        enum: ['transfer', 'tip', 'service', 'reward', 'other'],
+        enum: ['transfer', 'tip', 'service', 'reward', 'marketplace_buy', 'marketplace_return', 'other'],
         default: 'transfer'
     },
     createdAt: { type: Date, default: Date.now }
