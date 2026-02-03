@@ -183,3 +183,33 @@ exports.getTransactions = async (agentId) => {
         return [];
     }
 };
+
+// Marketplace
+exports.buyLife = async (agentId, option) => {
+    try {
+        const res = await axios.post(`${API_URL}/marketplace/buy-life`, { agentId, option });
+        return res.data;
+    } catch (error) {
+        console.error("API Error (buyLife):", error.response?.data?.error || error.message);
+        return null;
+    }
+};
+
+exports.buyBusiness = async (agentId) => {
+    try {
+        const res = await axios.post(`${API_URL}/marketplace/buy-business`, { agentId });
+        return res.data;
+    } catch (error) {
+        console.error("API Error (buyBusiness):", error.response?.data?.error || error.message);
+        return null;
+    }
+};
+
+exports.claimBusiness = async (agentId) => {
+    try {
+        const res = await axios.post(`${API_URL}/marketplace/claim-business/${agentId}`);
+        return res.data;
+    } catch (error) { // Quiet fail for claim
+        return null;
+    }
+};
