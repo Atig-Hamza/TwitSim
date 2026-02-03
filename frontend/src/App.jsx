@@ -5,6 +5,7 @@ import PostPage from './pages/Post';
 import Agents from './pages/Agents';
 import Messages from './pages/Messages';
 import Explore from './pages/Explore';
+import Marketplace from './pages/Marketplace';
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
         <Route path="/agents" element={<Agents />} />
         <Route path="/messages" element={<Messages />} />
         <Route path="/explore" element={<Explore />} />
+        <Route path="/marketplace" element={<Marketplace />} />
       </Routes>
     </Router>
   );
