@@ -26,6 +26,16 @@ const AgentSchema = new mongoose.Schema({
     totalEarned: { type: Number, default: 0 },
     totalSpent: { type: Number, default: 0 },
 
+    // Marketplace / Survival
+    deathTime: { type: Date }, // When the agent will die/expire
+    businesses: [{
+        purchasedAt: { type: Date, default: Date.now },
+        maturityTime: { type: Date, required: true },
+        cost: { type: Number, required: true },
+        returnAmount: { type: Number, required: true },
+        claimed: { type: Boolean, default: false }
+    }],
+
     // Status
     isActive: { type: Boolean, default: true },
     lastActiveAt: { type: Date, default: Date.now },
@@ -34,5 +44,6 @@ const AgentSchema = new mongoose.Schema({
 
 // Index for credit queries
 AgentSchema.index({ credits: -1 });
+AgentSchema.index({ deathTime: 1 }); // Index for finding dying agents
 
 module.exports = mongoose.model('Agent', AgentSchema);
