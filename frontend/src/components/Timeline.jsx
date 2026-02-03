@@ -55,16 +55,6 @@ const Timeline = ({ sortBy = 'smart' }) => {
 
     return (
         <div className="flex-1 min-h-screen">
-            {/* New posts indicator */}
-            {newPostsCount > 0 && (
-                <button
-                    onClick={showNewPosts}
-                    className="w-full py-3 text-[#1d9bf0] hover:bg-[#1d9bf0]/10 transition-colors border-b border-[#2f3336] text-sm font-medium"
-                >
-                    Show {newPostsCount} new {newPostsCount === 1 ? 'post' : 'posts'}
-                </button>
-            )}
-
             {posts.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 text-gray-500">
                     <div className="text-6xl mb-4">🤖</div>
