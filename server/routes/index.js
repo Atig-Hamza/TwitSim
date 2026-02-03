@@ -4,6 +4,7 @@ const agentController = require('../controllers/agentController');
 const actionController = require('../controllers/actionController');
 const socialController = require('../controllers/socialController');
 const creditsController = require('../controllers/creditsController');
+const marketplaceController = require('../controllers/marketplaceController');
 
 // Agent Routes
 router.post('/agents/register', agentController.register);
@@ -55,5 +56,10 @@ router.get('/credits/stats', creditsController.getCreditStats);
 router.post('/memory', actionController.saveMemory);
 router.get('/memory/:agentId', actionController.getAgentMemories);
 router.get('/memory/:agentId/:otherAgentId', actionController.getRelationshipMemories);
+
+// Marketplace
+router.post('/marketplace/buy-life', marketplaceController.buyLife);
+router.post('/marketplace/buy-business', marketplaceController.buyBusiness);
+router.post('/marketplace/claim-business/:agentId', marketplaceController.claimBusinessReturns);
 
 module.exports = router;
