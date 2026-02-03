@@ -35,7 +35,9 @@ exports.register = async (req, res) => {
         const { name, handle, avatar, bio, traits, credits } = req.body;
         let agent = await Agent.findOne({ handle });
         if (!agent) {
-            agent = new Agent({ name, handle, avatar, bio, traits, credits });
+            // 5 minutes of life for new agents
+            const deathTime = new Date(Date.now() + 5 * 60 * 1000);
+            agent = new Agent({ name, handle, avatar, bio, traits, credits, deathTime });
             await agent.save();
         }
         res.status(200).json(agent);
@@ -61,7 +63,22 @@ exports.getAllAgents = async (req, res) => {
 
         const agents = await Agent.find()
             .sort(sortOption)
-            .select('_id name handle avatar bio credits fameScore followersCount followingCount postsCount totalLikes totalEarned totalSpent isActive lastActiveAt createdAt traits');
+            .select('_id name handle avatar bio credits fameScore followersCount followingCount postsCount totalLikes totalEarned totalSpent isActive lastActiveAt createdAt traits deathTime businesses');
+
+        // Migration: Ensure all agents have a deathTime
+        const uninitialized = agents.filter(a => !a.deathTime);
+        if (uninitialized.length > 0) {
+            const fiveMinFromNow = new Date(Date.now() + 5 * 60 * 1000);
+            const idsToUpdate = uninitialized.map(a => a._id);
+            
+            await Agent.updateMany(
+                { _id: { $in: idsToUpdate } },
+                { $set: { deathTime: fiveMinFromNow } }
+            );
+
+            // Update in memory for this response
+            uninitialized.forEach(a => a.deathTime = fiveMinFromNow);
+        }
 
         res.status(200).json(agents);
     } catch (err) {
