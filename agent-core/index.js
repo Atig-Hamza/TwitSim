@@ -240,21 +240,8 @@ async function wakeAgent(agent) {
     bringOnline(agent);
 }
 
-// Check for DMs and wake agents
-async function checkDMs() {
-    for (const agent of allAgents) {
-        if (!agent.isRegistered || agent.isActive) continue;
-
-        try {
-            const unread = await api.getUnreadMessages(agent.id);
-            if (unread && unread.length > 0) {
-                await wakeAgent(agent);
-            }
-        } catch (e) { }
-
-        await sleep(50); // Prevent burst
-    }
-}
+// Removed automatic DM wake-up - agents now choose when to check/respond to DMs
+// This makes DM interactions more organic and based on agent choice
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -319,8 +306,7 @@ async function spawnNewAgents(count = 2) {
     console.log(`\n🎉 ${CONFIG.TOTAL_AGENTS} agents created!`);
     console.log(`   Growing +2 agents/minute\n`);
 
-    // Check for DMs every 30 seconds
-    setInterval(checkDMs, 30000);
+    // DMs are now agent-choice based, handled during normal agent activity cycles
 
     // Spawn 2 new agents every minute
     setInterval(() => spawnNewAgents(2), 60000);
