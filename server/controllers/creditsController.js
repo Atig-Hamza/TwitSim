@@ -166,11 +166,27 @@ exports.getCreditStats = async (req, res) => {
             .sort({ totalEarned: -1 })
             .select('handle totalEarned');
 
+        const marketplaceStats = await Transaction.aggregate([
+            { $match: { type: 'marketplace_buy' } },
+            {
+                $group: {
+                    _id: null,
+                    totalSales: { $sum: 1 },
+                    spent: { $sum: '$amount' },
+                    life7m: { $sum: { $cond: [{ $regexMatch: { input: '$note', regex: /7 minutes/ } }, 1, 0] } },
+                    life15m: { $sum: { $cond: [{ $regexMatch: { input: '$note', regex: /15 minutes/ } }, 1, 0] } },
+                    life25m: { $sum: { $cond: [{ $regexMatch: { input: '$note', regex: /25 minutes/ } }, 1, 0] } },
+                    businesses: { $sum: { $cond: [{ $regexMatch: { input: '$note', regex: /Business/ } }, 1, 0] } }
+                }
+            }
+        ]);
+
         res.status(200).json({
             ...stats[0],
             recentTransactions,
             biggestTx: biggestTransaction,
-            topEarner
+            topEarner,
+            marketplace: marketplaceStats[0] || { life7m: 0, life15m: 0, life25m: 0, businesses: 0 }
         });
     } catch (err) {
         res.status(500).json({ error: err.message });
