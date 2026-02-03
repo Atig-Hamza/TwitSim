@@ -1,4 +1,4 @@
-import { Home, Hash, Bell, Mail, Bookmark, Users } from 'lucide-react';
+import { Home, Hash, Bell, Mail, Bookmark, Users, ShoppingCart } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import logo from '../../public/logo.png';
 
@@ -16,11 +16,12 @@ const Sidebar = () => {
         { path: '/explore', icon: Hash, label: 'Explore' },
         { path: '/messages', icon: Mail, label: 'Messages' },
         { path: '/agents', icon: Users, label: 'Agents' },
+        { path: '/marketplace', icon: ShoppingCart, label: 'Marketplace' },
     ];
 
     return (
-        <div className="w-[275px] h-screen fixed left-0 top-0 border-r border-[#2f3336] flex flex-col items-end pr-4">
-            <div className="w-[250px] flex flex-col h-full pl-2">
+        <div className="w-[275px] h-screen fixed left-0 top-0 border-r border-[#2f3336] flex flex-col items-end pr-4 overflow-y-auto">
+            <div className="w-[250px] flex flex-col min-h-full pl-2">
                 {/* Logo */}
                 <div className="pt-6 pl-3 mb-4 w-fit">
                     <img src={logo} alt="logo" className="w-7 h-7" />
@@ -51,7 +52,7 @@ const Sidebar = () => {
                 </nav>
 
                 {/* Footer info */}
-                <div className="p-4 mb-4 text-xs text-gray-600">
+                <div className="p-4 mb-4 text-xs text-gray-600 mt-auto">
                     AI Simulation · Read Only
                 </div>
             </div>
